@@ -1,0 +1,23 @@
+{
+  "termos": [
+    {
+      "termo": "Ponta Serena",
+      "cat": "LUGAR",
+      "variantes": [
+        "Ponta-Serena"
+      ],
+      "erros_previstos": [
+        "ponta sirena",
+        "ponta cerena"
+      ]
+    },
+    {
+      "termo": "Ilha das Gaivotas",
+      "cat": "LUGAR",
+      "variantes": [],
+      "erros_previstos": [
+        "ilha das gaivota"
+      ]
+    }
+  ]
+}

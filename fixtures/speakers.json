@@ -1,0 +1,27 @@
+{
+  "_rotulos_genericos": [
+    "Entrevistador",
+    "Apresentador",
+    "Participante 1",
+    "Participante 2",
+    "Pergunta da plateia",
+    "Pergunta lida",
+    "Moderador",
+    "Não identificado"
+  ],
+  "autor_principal": {
+    "nome_canonico": "Narrador Inventado"
+  },
+  "canais": [
+    {
+      "canal": "Canal Inventado",
+      "falantes_conhecidos": [
+        {
+          "nome": "Entrevistadora Fictícia",
+          "papel": "host",
+          "confirmado": true
+        }
+      ]
+    }
+  ]
+}

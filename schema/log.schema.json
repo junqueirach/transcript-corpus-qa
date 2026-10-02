@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/junqueirach/transcript-corpus-qa/schema/log.schema.json",
+  "title": "tcqa structured correction log (one JSON object per line)",
+  "description": "Line 1 is a header object. Every following line is a change or a bulk object. The same rules are enforced in code by tcqa.log.validate_log, which needs no external library; this file documents them.",
+  "oneOf": [
+    {"$ref": "#/$defs/header"},
+    {"$ref": "#/$defs/change"},
+    {"$ref": "#/$defs/bulk"}
+  ],
+  "$defs": {
+    "header": {
+      "type": "object",
+      "required": ["type", "file", "raw_sha256", "idioma", "derivado_de", "versao_revisao", "revisado_em", "revisado_por", "classe_calculada", "classe_qualidade", "override_motivo"],
+      "properties": {
+        "type": {"const": "header"},
+        "file": {"type": "string", "minLength": 1},
+        "raw_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "idioma": {"type": ["string", "null"]},
+        "falante_nativo": {"type": ["boolean", "null"]},
+        "derivado_de": {"type": ["string", "null"]},
+        "versao_revisao": {"type": "integer", "minimum": 1},
+        "revisado_em": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "revisado_por": {"type": "string"},
+        "classe_calculada": {"type": ["string", "null"], "enum": ["A", "B", "C", null]},
+        "classe_qualidade": {"type": "string", "enum": ["A", "B", "C"]},
+        "override_motivo": {"type": ["string", "null"]},
+        "notas": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "change": {
+      "type": "object",
+      "required": ["type", "id", "para", "raw", "revised", "categoria", "tier", "basis", "confidence", "marker"],
+      "properties": {
+        "type": {"const": "change"},
+        "id": {"type": "string", "pattern": "^c\\d{4,}$"},
+        "para": {"type": "integer", "minimum": 1},
+        "para_raw": {"type": "integer", "minimum": 1},
+        "raw": {"type": "string"},
+        "revised": {"type": "string"},
+        "categoria": {"type": "string", "enum": ["pontuacao", "nome", "termo", "sentido", "falante", "ruido", "hesitacao", "marcacao", "insercao", "remocao", "traducao"]},
+        "tier": {"type": ["string", "null"], "enum": ["T1", "T2", "T3", "T4", null]},
+        "basis": {"type": ["string", "null"]},
+        "confidence": {"type": ["string", "null"], "enum": ["high", "medium", "low", null]},
+        "marker": {"type": ["string", "null"], "enum": ["?", "??", null]},
+        "falante_novo": {
+          "type": "object",
+          "required": ["nome", "citacao"],
+          "properties": {"nome": {"type": "string", "minLength": 1}, "citacao": {"type": "string", "minLength": 1}}
+        },
+        "notas": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "bulk": {
+      "type": "object",
+      "required": ["type", "categoria", "count"],
+      "properties": {
+        "type": {"const": "bulk"},
+        "categoria": {"type": "string", "enum": ["pontuacao", "hesitacao", "ruido"]},
+        "count": {"type": "integer", "minimum": 0},
+        "notas": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-semantic-rules": [
+    "Exactly one header, and it is the first line.",
+    "Change ids are unique within the file.",
+    "A marker entry (marker != null) has tier null and its revised span contains the raw span unchanged, inside [[? ]] or [[?? ]], optionally followed by ' ⟶ sugestão: ...'.",
+    "A non-marker entry with raw == '' has categoria 'insercao' or 'falante'; with revised == '' it has categoria 'remocao', 'ruido' or 'hesitacao'.",
+    "A non-marker change (text actually altered) has a tier and confidence 'high'. Confidence medium/low is only valid on marker entries (suggestions).",
+    "T3 requires basis starting with 'crossfile:'; T4 requires basis starting with 'external:'; T2 requires basis starting with 'context:'; T1 requires basis starting with 'lexicon:' or a short free-text basis.",
+    "classe_qualidade may differ from classe_calculada by at most one step and only when override_motivo is a non-empty string."
+  ]
+}

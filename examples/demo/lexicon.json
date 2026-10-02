@@ -1,0 +1,21 @@
+{
+  "termos": [
+    {
+      "termo": "Ponta Serena",
+      "cat": "LUGAR",
+      "variantes": [],
+      "erros_previstos": [
+        "ponta sirena",
+        "ponta cerena"
+      ]
+    },
+    {
+      "termo": "Island of Gulls",
+      "cat": "LUGAR",
+      "variantes": [],
+      "erros_previstos": [
+        "island of girls"
+      ]
+    }
+  ]
+}

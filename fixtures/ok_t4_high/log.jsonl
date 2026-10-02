@@ -1,0 +1,6 @@
+{"type": "header", "file": "revised.md", "raw_sha256": "8e5608c031fa76c2e9ade2d4858bf23c540a27225f891068e4f530dbc1d10710", "idioma": "pt", "falante_nativo": true, "derivado_de": null, "versao_revisao": 1, "revisado_em": "2026-10-02", "revisado_por": "fixture", "classe_calculada": "A", "classe_qualidade": "A", "override_motivo": null, "notas": null}
+{"type": "bulk", "categoria": "pontuacao", "count": 30}
+{"type": "change", "id": "c0001", "para": 1, "raw": "ponta sirena", "revised": "Ponta Serena", "categoria": "nome", "tier": "T1", "basis": "lexicon:Ponta Serena", "confidence": "high", "marker": null}
+{"type": "change", "id": "c0002", "para": 2, "raw": "agarmassa", "revised": "argamassa", "categoria": "termo", "tier": "T2", "basis": "context: 'assentadas sem ___' admits one reading", "confidence": "high", "marker": null}
+{"type": "change", "id": "c0003", "para": 2, "raw": "[Música]", "revised": "", "categoria": "ruido", "tier": "T1", "basis": "ASR noise tag", "confidence": "high", "marker": null}
+{"type": "change", "id": "c0008", "para": 2, "raw": "tarbaldo vrzeni", "revised": "Teobaldo Verzeni", "categoria": "nome", "tier": "T4", "basis": "external: 19th-century engineer of the region", "confidence": "high", "marker": null}

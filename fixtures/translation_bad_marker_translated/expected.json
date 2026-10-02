@@ -1,0 +1,9 @@
+{
+  "pass": false,
+  "error_checks": [
+    "C13"
+  ],
+  "warning_checks": [],
+  "source": "raw.md",
+  "translation": true
+}

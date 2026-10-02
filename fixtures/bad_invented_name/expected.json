@@ -1,0 +1,8 @@
+{
+  "pass": false,
+  "error_checks": [
+    "C1",
+    "C14"
+  ],
+  "warning_checks": []
+}
