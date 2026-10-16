@@ -9,7 +9,7 @@
                "classe_qualidade", "override_motivo", "apto_rag", "apto_finetuning"],
   "properties": {
     "titulo": {"type": "string", "description": "Title of the recording"},
-    "autor_principal": {"type": ["string", "null"], "description": "Main speaker"},
+    "autor_principal": {"type": ["string", "null"], "description": "Main author of the corpus (the registry's autor_principal), the person whose participation is tracked; the speakers of this file are in falantes / entrevistados. Older files may hold the main speaker here"},
     "falantes": {"type": "array", "items": {"type": "string"}, "description": "Speakers in order of appearance; one entry means a solo talk (no labels allowed). Must match the labels used in the text"},
     "entrevistador": {"type": ["string", "null"], "description": "Label of the person conducting the interview (host); null for a solo talk"},
     "entrevistados": {"type": "array", "items": {"type": "string"}, "description": "Labels of the interviewed / main speakers"},

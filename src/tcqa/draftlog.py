@@ -39,8 +39,9 @@ def _guess_categoria(raw: str, revised: str) -> str:
 
 
 def draft(raw_text: str, revised_text: str, log: Log | None, lexicon=None, speakers=None,
-          revised_name: str = "revised.md", reviser: str = "tcqa-reviser") -> list[dict]:
-    raw_bytes = raw_text.encode("utf-8")
+          revised_name: str = "revised.md", reviser: str = "tcqa-reviser", raw_bytes: bytes | None = None) -> list[dict]:
+    # hash the file's real bytes: text read in Python has its CRLF line endings already converted
+    raw_bytes = raw_bytes if raw_bytes is not None else raw_text.encode("utf-8")
     checker = Checker(raw_text, revised_text, log, [], lexicon=lexicon, speakers=speakers, raw_bytes=raw_bytes)
     checker._align()
     checker._locate_entries()
@@ -76,8 +77,11 @@ def draft(raw_text: str, revised_text: str, log: Log | None, lexicon=None, speak
         return cid
 
     raw_keys, rev_tokens = checker.raw_keys, checker.rev.tokens
+    claimed: set[int] = set()          # raw positions already covered by a stub (a widened span may swallow the next hunk)
     for h in checker.result.hunks:
         if h.status != "unexplained":
+            continue
+        if h.i2 > h.i1 and all(k in claimed for k in range(h.i1, h.i2)):
             continue
         raw_txt = _span_text(checker.raw.tokens, h.i1, h.i2, checker.raw.body)
         rev_txt = _span_text(rev_tokens, h.j1, h.j2, checker.rev.body)
@@ -113,10 +117,12 @@ def draft(raw_text: str, revised_text: str, log: Log | None, lexicon=None, speak
                         hits = find_subsequence(raw_keys, raw_keys[a:b])
                         if len(hits) > 1 and a in hits:
                             entry["occurrence"] = hits.index(a) + 1
+                        claimed.update(range(a, b))
                         done = True
                         break
                 if done:
                     break
+        claimed.update(range(h.i1, h.i2))
         lines.append(entry)
     for m in checker.rev.markers:
         text = checker.rev.body[m.start:m.end]
@@ -130,14 +136,15 @@ def draft(raw_text: str, revised_text: str, log: Log | None, lexicon=None, speak
 
 
 def cmd_draft_log(args: argparse.Namespace) -> int:
-    raw_text = Path(args.raw).read_text(encoding="utf-8")
+    raw_bytes = Path(args.raw).read_bytes()
+    raw_text = raw_bytes.decode("utf-8")
     revised_text = Path(args.revised).read_text(encoding="utf-8")
     log = None
     if args.log and Path(args.log).exists():
         log, _ = load_log(Path(args.log))
     lex = load_lexicon(args.lexicon) if args.lexicon else None
     sp = load_speakers(args.speakers) if args.speakers else None
-    lines = draft(raw_text, revised_text, log, lex, sp, revised_name=Path(args.revised).name)
+    lines = draft(raw_text, revised_text, log, lex, sp, revised_name=Path(args.revised).name, raw_bytes=raw_bytes)
     out = Path(args.out) if args.out else (Path(args.log) if args.log else Path(args.revised).with_suffix(".log.jsonl"))
     text = "\n".join(json.dumps(x, ensure_ascii=False) for x in lines)
     if log is not None and out.exists():

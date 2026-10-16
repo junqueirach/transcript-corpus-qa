@@ -151,6 +151,44 @@ def validate(data: dict) -> list[str]:
     return problems
 
 
+def corpus_common_forms(data: dict, raw_paths: list[Path], share: float = 0.5) -> list[str]:
+    """Error forms that occur in at least ``share`` of the raw files: in a real corpus an
+    ASR error of a rare term is rare, so a form found nearly everywhere is a common word."""
+    forms: dict[tuple, list[str]] = {}
+    for entry in _terms(data):
+        if str(entry.get("risco_homofonia") or "").casefold() in HOMOPHONE_VALUES:
+            continue
+        term = entry.get("termo") or entry.get("term")
+        for kind, form in _forms(entry):
+            if kind == "erro":
+                fk = tuple(keys_of(form))
+                if fk:
+                    forms.setdefault(fk, []).append(f"'{term}': error form '{form}'")
+    counts: Counter = Counter()
+    n = 0
+    for path in raw_paths:
+        try:
+            keys = [t.key for t in analyze(path.read_text(encoding="utf-8")).tokens]
+        except (OSError, UnicodeDecodeError):
+            continue
+        n += 1
+        seen = set()
+        for i in range(len(keys)):
+            for size in (1, 2, 3):
+                k = tuple(keys[i:i + size])
+                if k in forms:
+                    seen.add(k)
+        counts.update(seen)
+    if not n:
+        return []
+    out = []
+    for fk, labels in forms.items():
+        if counts[fk] / n >= share:
+            for label in labels:
+                out.append(f"{label} occurs in {counts[fk]}/{n} raw files: possibly a common word (set risco_homofonia: alto or remove it)")
+    return out
+
+
 def stats(data: dict) -> dict:
     terms = _terms(data)
     return {"termos": len(terms),
@@ -331,6 +369,14 @@ def cmd_lexicon(args: argparse.Namespace) -> int:
         problems = validate(data)
         for p in problems:
             print(f"  {p}")
+        if args.corpus:
+            raws = [p for p in sorted(Path(args.corpus).rglob("*.md"))
+                    if not any(part.startswith("_") for part in p.relative_to(Path(args.corpus)).parts[:-1])
+                    and not p.read_text(encoding="utf-8", errors="replace").startswith("---")]
+            advice = corpus_common_forms(data, raws, args.common_share)
+            print(f"advice ({len(advice)}): error forms frequent in the corpus — check each, it may be a common word")
+            for a in advice:
+                print(f"  ? {a}")
         print(f"{'INVALID' if problems else 'VALID'} — {len(_terms(data))} term(s), {len(problems)} problem(s)")
         load_lexicon(Path(args.target))
         return 1 if problems else 0
@@ -380,6 +426,8 @@ def add_lexicon_parser(sub) -> None:
     p.add_argument("--speakers", help="hits/learn: speaker registry (its name forms count as lexicon)")
     p.add_argument("--out", help="output file (hits JSON, merged lexicon)")
     p.add_argument("--fuzzy", type=float, default=0.86, help="hits: similarity for near-matches (0-1)")
+    p.add_argument("--corpus", help="validate: raw corpus folder; error forms found in most files are flagged as common words")
+    p.add_argument("--common-share", type=float, default=0.15, help="validate --corpus: share of files above which a form is 'common'")
     p.add_argument("--min", type=int, default=2, help="learn: occurrences needed to add a form automatically")
     p.add_argument("--write", action="store_true", help="learn: update the lexicon (backup + changelog)")
     p.add_argument("--pending", help="learn: pending-terms file to update (new terms awaiting approval)")

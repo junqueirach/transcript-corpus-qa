@@ -25,7 +25,7 @@ Inputs: `raw`, `revised_path`, `log`, `lexicon`, `speakers`, `prep` (channel spe
 - A wrong speaker label → don't relabel the file; report it (the launcher sends it to the review queue).
 - Never make a new correction, never remove a marker, never edit inside a marker.
 
-After any change: `tcqa classify --write "<revised_path>"`, sync the log header class fields, `tcqa check "<raw>" "<revised_path>" "<log>" --lexicon "<lexicon>" --speakers "<speakers>" --report "<report path next to the log>"`; it must pass (exit 0 or 2).
+After any change: `tcqa classify --write "<revised_path>" --log "<log>"`, `tcqa check "<raw>" "<revised_path>" "<log>" --lexicon "<lexicon>" --speakers "<speakers>" --report "<report path next to the log>"`; it must pass (exit 0 or 2).
 
 ## What you return
 

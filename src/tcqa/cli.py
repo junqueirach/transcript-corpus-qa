@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -71,6 +72,19 @@ def cmd_classify(args: argparse.Namespace) -> int:
             fm["pct_nao_conteudo"] = non_content_share(doc, segments)
         if fm.get("classe_qualidade") in (None, ""):
             fm["classe_qualidade"] = comp.classe_calculada
+        if args.log:
+            log, _ = load_log(Path(args.log))
+            if log is not None:
+                fm["termos_corrigidos"] = sum(1 for e in log.changes if e.get("tier") == "T1" and str(e.get("basis", "")).startswith("lexicon:"))
+                # keep the log header in step with the front matter
+                header_keys = ("classe_calculada", "classe_qualidade", "override_motivo", "idioma")
+                lines = Path(args.log).read_text(encoding="utf-8").splitlines()
+                head = json.loads(lines[0])
+                for key in header_keys:
+                    if key in fm:
+                        head[key] = fm[key]
+                lines[0] = json.dumps(head, ensure_ascii=False)
+                Path(args.log).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         _, body, _ = split_document(text)
         path.write_text(join_document(fm, body), encoding="utf-8", newline="\n")
         print(f"front matter updated in {path}")
@@ -109,6 +123,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     k = sub.add_parser("classify", help="compute class, counts and flags of a revised file")
     k.add_argument("revised"); k.add_argument("--write", action="store_true", help="update the computed fields in the front matter")
+    k.add_argument("--log", help="with --write: also set termos_corrigidos from the log and sync the log header (class, override, idioma)")
     k.add_argument("--finetune-languages")
     k.set_defaults(func=cmd_classify)
 

@@ -134,3 +134,40 @@ def test_agent_install_renders_placeholders(tmp_path):
     skill = (tmp_path / "skills" / "tcqa" / "SKILL.md").read_text(encoding="utf-8")
     assert "{TCQA_REPO}" not in skill and str(REPO) in skill
     assert mod.main(["--claude-home", str(tmp_path), "--check"]) == 0
+
+
+def test_draft_log_hashes_raw_bytes_and_does_not_duplicate_widened_spans(tmp_path):
+    from tcqa.checker import sha256_bytes
+    raw = "Título: t\r\nQualidade: Bruta\r\n\r\ne o joão val elan falou\r\n".encode("utf-8")   # CRLF on disk
+    (tmp_path / "raw.md").write_bytes(raw)
+    (tmp_path / "rev.md").write_text("---\ntitulo: t\nidioma: pt\n---\n\nE o Jan Val Ellam falou.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "lex.json").write_text(json.dumps({"termos": [{"termo": "Jan Val Ellam", "erros_previstos": ["joão val elan"]}]}), encoding="utf-8")
+    out = tmp_path / "log.jsonl"
+    assert main(["draft-log", str(tmp_path / "raw.md"), str(tmp_path / "rev.md"), "--lexicon", str(tmp_path / "lex.json"), "--out", str(out)]) == 0
+    lines = [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines()]
+    assert lines[0]["raw_sha256"] == sha256_bytes(raw)
+    changes = [l for l in lines if l.get("type") == "change"]
+    assert len(changes) == 1 and changes[0]["raw"] == "joão val elan" and changes[0]["tier"] == "T1"
+
+
+def test_classify_log_sets_termos_corrigidos_and_syncs_header(tmp_path):
+    shutil.copy(DEMO / "revised_good.md", tmp_path / "r.md")
+    shutil.copy(DEMO / "log_good.jsonl", tmp_path / "l.jsonl")
+    text = (tmp_path / "r.md").read_text(encoding="utf-8").replace("termos_corrigidos: 1", "termos_corrigidos: 0")
+    (tmp_path / "r.md").write_text(text, encoding="utf-8", newline="\n")
+    assert main(["classify", str(tmp_path / "r.md"), "--write", "--log", str(tmp_path / "l.jsonl")]) == 0
+    assert "termos_corrigidos: 1" in (tmp_path / "r.md").read_text(encoding="utf-8")
+    head = json.loads((tmp_path / "l.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert head["classe_calculada"] == "B" and head["idioma"] == "en"
+
+
+def test_corpus_frequency_flags_common_error_forms(tmp_path):
+    from tcqa.lexicon_tools import corpus_common_forms
+    data = {"termos": [{"termo": "Vega", "erros_previstos": ["veja"]}, {"termo": "Ponta Serena", "erros_previstos": ["ponta sirena"]}]}
+    raws = []
+    for i in range(4):
+        p = tmp_path / f"r{i}.md"
+        p.write_text("Título: t\n\nveja bem " + ("o farol da ponta sirena" if i == 0 else "nada") + "\n", encoding="utf-8")
+        raws.append(p)
+    flagged = " ".join(corpus_common_forms(data, raws, 0.5))
+    assert "'veja'" in flagged and "ponta sirena" not in flagged

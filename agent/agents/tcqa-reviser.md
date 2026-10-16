@@ -53,12 +53,12 @@ Inside a marker the original words are copied **exactly**. Markers never nest, n
 ## Speakers — name them when sure (mandatory)
 
 Use the labels from `prep`. They were decided from: folder (channel), file name (video), header `Autor:`, and the text (greetings, introductions, self-identification, spelled names, direct address, thanks, "no meu livro…", biography clues, third-person mentions that rule someone out), decoding garbled names via registry/lexicon.
-- **Sure** (≥2 independent sources agree, none contradicts) → the real name is **mandatory**: in the turn labels `**[Alfredo Nahas]**`, in `falantes`, `entrevistados`/`entrevistador`, `autor_principal` when that person is the main speaker. A generic label when the identity is clear is a mistake.
+- **Sure** (≥2 independent sources agree, none contradicts) → the real name is **mandatory**: in the turn labels `**[Alfredo Nahas]**`, in `falantes`, `entrevistados`/`entrevistador`. A generic label when the identity is clear is a mistake.
 - Name not in the registry → still use it; on the change entry of its first labelled turn add `"categoria": "falante"` and `"falante_novo": {"nome": "<Name>", "citacao": "<¶n quote(s)>"}` (raw `""`, revised the label, tier T2, basis `context: <evidence>`). `tcqa check` then gives warning C10 (expected).
-- Host known only by nickname → `Guru (Alegria de Viver)` style label (via `falante_novo` if unregistered).
+- Host known only by a stage name or nickname → use it as the label (e.g. `Guru do Himalaia`), via `falante_novo` if unregistered.
 - **Not sure** → generic label from the registry; report the candidate and why.
 - **Uncertain turn boundaries** (K4): add a review note after the paragraph — `> **[nota de revisão]** troca de falante incerta: …` — and list it in your result.
-- Front matter, always: `falantes` (exactly the labels you used), `entrevistador`, `entrevistados`, `mencionados` (people talked about, not speaking), `autor_principal_participa` (true/false: does the corpus's main author speak here? — corpus control), `evidencia_falantes` (one item per clue, with ¶).
+- Front matter, always: `falantes` (exactly the labels you used), `entrevistador`, `entrevistados`, `mencionados` (people talked about, not speaking), `autor_principal` = **the corpus's main author** from the registry (`autor_principal.nome_canonico`, e.g. Jan Val Ellam) — not this file's guest —, `autor_principal_participa` (true/false: does that person speak here? — corpus control), `evidencia_falantes` (one item per clue, with ¶).
 
 ## Procedure
 
@@ -69,7 +69,7 @@ Use the labels from `prep`. They were decided from: folder (channel), file name 
 4. **Log via draft-log** — don't hand-write the bookkeeping:
    `tcqa draft-log "<raw>" "<revised_path>" --lexicon "<lexicon>" --speakers "<speakers>" --out "<log>"`
    It writes the header, bulk counts, one stub per unexplained difference (with `para`, `raw`, `revised`, `occurrence`) and per marker, and pre-fills listed lexicon fixes as T1. **Complete every stub** (`basis` starts with `TODO`): set tier, basis (with the right prefix), confidence; for a speaker entry set `categoria: falante` and `falante_novo`; for markers write why. If a stub shows a change you didn't intend, revert it in the text and re-run draft-log. Check each pre-filled T1 (is the term really meant?).
-5. `tcqa classify --write "<revised_path>"`; set `classe_qualidade` = `classe_calculada` (one-step override only with a real `override_motivo`); sync the log header (`classe_calculada`, `classe_qualidade`, `override_motivo`, `idioma`).
+5. `tcqa classify --write "<revised_path>" --log "<log>"` — fills the computed fields and `termos_corrigidos`, and syncs the log header (`classe_calculada`, `classe_qualidade`, `override_motivo`, `idioma`). Set `classe_qualidade` = `classe_calculada` if it differs (one-step override only with a real `override_motivo`) and run it again. `versao_revisao` stays 1 for a first revision, also when a run replaces an earlier run's output.
 6. `tcqa check "<raw>" "<revised_path>" "<log>" --lexicon "<lexicon>" --speakers "<speakers>" --report "<audit_dir>\<stem>.report.md"` (+ `--finetune-languages`).
    - **Exit 1**: read every finding and fix the cause honestly — complete/correct the entry, revert the change, or turn it into a marker; for a repeated span add `occurrence`. Rerun 5–6. Up to 3 repair rounds.
    - **Exit 2**: examine each warning. Real → fix. Accepted (e.g. C10 for a proposed speaker, C11 homophony when the context is clear) → add a log line `{"type": "aceite", "code": "C10", "para": n, "motivo": "<why>"}`.
