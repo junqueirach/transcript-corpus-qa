@@ -249,7 +249,7 @@ def _core(lex, revised: str, raw: str):
                         candidates.append((n, lex.canonical[tk], core))
     if not candidates:
         return None
-    _, term, core = max(candidates, key=lambda c: c[0])   # the longest term wins ('Jan Val Ellam' over 'Val Ellam')
+    _, term, core = max(candidates, key=lambda c: c[0])   # the longest term wins ('Rui Sol Andrade' over 'Sol Andrade')
     return term, core
 
 

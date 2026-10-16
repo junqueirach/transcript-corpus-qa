@@ -146,8 +146,6 @@ text, and a translation with the wrong paragraph count. Seventy-five
 random-mutation tests insert, delete or swap one content word in a passing
 revision and require the checker to fail every time.
 
-## Roadmap
-
 ## The tcqa agent (Claude Code)
 
 `agent/` holds a Claude Code agent that runs the whole method over a corpus:
@@ -158,6 +156,10 @@ output root and file naming once, checks the lexicon first, prepares each channe
 lexicon from the results, builds one grouped review queue, and ends every run with
 a summary that starts with what needs your attention. Raw files are never edited.
 Install: `python agent/install.py` (copies the files to `~/.claude/`).
+
+The agent runs inside Claude Code and uses Claude models to revise and verify. The
+`tcqa` commands it calls stay offline and deterministic: the agent judges, the checker
+proves. The examples in `agent/` use invented names.
 
 ## Roadmap
 

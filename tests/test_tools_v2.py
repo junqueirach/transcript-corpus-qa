@@ -138,16 +138,16 @@ def test_agent_install_renders_placeholders(tmp_path):
 
 def test_draft_log_hashes_raw_bytes_and_does_not_duplicate_widened_spans(tmp_path):
     from tcqa.checker import sha256_bytes
-    raw = "Título: t\r\nQualidade: Bruta\r\n\r\ne o joão val elan falou\r\n".encode("utf-8")   # CRLF on disk
+    raw = "Título: t\r\nQualidade: Bruta\r\n\r\ne o ruy sol andradi falou\r\n".encode("utf-8")   # CRLF on disk
     (tmp_path / "raw.md").write_bytes(raw)
-    (tmp_path / "rev.md").write_text("---\ntitulo: t\nidioma: pt\n---\n\nE o Jan Val Ellam falou.\n", encoding="utf-8", newline="\n")
-    (tmp_path / "lex.json").write_text(json.dumps({"termos": [{"termo": "Jan Val Ellam", "erros_previstos": ["joão val elan"]}]}), encoding="utf-8")
+    (tmp_path / "rev.md").write_text("---\ntitulo: t\nidioma: pt\n---\n\nE o Rui Sol Andrade falou.\n", encoding="utf-8", newline="\n")
+    (tmp_path / "lex.json").write_text(json.dumps({"termos": [{"termo": "Rui Sol Andrade", "erros_previstos": ["ruy sol andradi"]}]}), encoding="utf-8")
     out = tmp_path / "log.jsonl"
     assert main(["draft-log", str(tmp_path / "raw.md"), str(tmp_path / "rev.md"), "--lexicon", str(tmp_path / "lex.json"), "--out", str(out)]) == 0
     lines = [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines()]
     assert lines[0]["raw_sha256"] == sha256_bytes(raw)
     changes = [l for l in lines if l.get("type") == "change"]
-    assert len(changes) == 1 and changes[0]["raw"] == "joão val elan" and changes[0]["tier"] == "T1"
+    assert len(changes) == 1 and changes[0]["raw"] == "ruy sol andradi" and changes[0]["tier"] == "T1"
 
 
 def test_classify_log_sets_termos_corrigidos_and_syncs_header(tmp_path):

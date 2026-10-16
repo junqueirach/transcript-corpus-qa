@@ -53,12 +53,12 @@ Inside a marker the original words are copied **exactly**. Markers never nest, n
 ## Speakers — name them when sure (mandatory)
 
 Use the labels from `prep`. They were decided from: folder (channel), file name (video), header `Autor:`, and the text (greetings, introductions, self-identification, spelled names, direct address, thanks, "no meu livro…", biography clues, third-person mentions that rule someone out), decoding garbled names via registry/lexicon.
-- **Sure** (≥2 independent sources agree, none contradicts) → the real name is **mandatory**: in the turn labels `**[Alfredo Nahas]**`, in `falantes`, `entrevistados`/`entrevistador`. A generic label when the identity is clear is a mistake.
+- **Sure** (≥2 independent sources agree, none contradicts) → the real name is **mandatory**: in the turn labels `**[Rosa Tavares]**`, in `falantes`, `entrevistados`/`entrevistador`. A generic label when the identity is clear is a mistake.
 - Name not in the registry → still use it; on the change entry of its first labelled turn add `"categoria": "falante"` and `"falante_novo": {"nome": "<Name>", "citacao": "<¶n quote(s)>"}` (raw `""`, revised the label, tier T2, basis `context: <evidence>`). `tcqa check` then gives warning C10 (expected).
-- Host known only by a stage name or nickname → use it as the label (e.g. `Guru do Himalaia`), via `falante_novo` if unregistered.
+- Host known only by a stage name or nickname → use it as the label (e.g. `Mestre da Serra`), via `falante_novo` if unregistered.
 - **Not sure** → generic label from the registry; report the candidate and why.
 - **Uncertain turn boundaries** (K4): add a review note after the paragraph — `> **[nota de revisão]** troca de falante incerta: …` — and list it in your result.
-- Front matter, always: `falantes` (exactly the labels you used), `entrevistador`, `entrevistados`, `mencionados` (people talked about, not speaking), `autor_principal` = **the corpus's main author** from the registry (`autor_principal.nome_canonico`, e.g. Jan Val Ellam) — not this file's guest —, `autor_principal_participa` (true/false: does that person speak here? — corpus control), `evidencia_falantes` (one item per clue, with ¶).
+- Front matter, always: `falantes` (exactly the labels you used), `entrevistador`, `entrevistados`, `mencionados` (people talked about, not speaking), `autor_principal` = **the corpus's main author** from the registry (`autor_principal.nome_canonico`, e.g. Rui Sol Andrade) — not this file's guest —, `autor_principal_participa` (true/false: does that person speak here? — corpus control), `evidencia_falantes` (one item per clue, with ¶).
 
 ## Procedure
 

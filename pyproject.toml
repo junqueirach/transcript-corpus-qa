@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tcqa"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fidelity checker for revised speech-to-text transcripts: proves a revision changed only what its log says."
 readme = "README.md"
 requires-python = ">=3.10"

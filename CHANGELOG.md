@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — 2026-10-17
+
+The agent pipeline ("tcqa v2"): new commands for a whole-corpus workflow and a Claude Code agent that uses them. Tested on a real corpus channel (3 files, all passing the check and verified).
 
 - `tcqa check` (C11): a T1 entry with `basis: "lexicon:<term>"` is now verified against the lexicon. The term must exist, the revised span must be the term or one of its variants, and the raw span must be one of its listed errors or variants (context words around the term are allowed). Before, any change could be passed off as T1 by citing a lexicon term, which was a false pass. Without `--lexicon` the entry gets a warning ("not verified"). New fixture `bad_t1_not_in_lexicon`.
 - Lexicon loader: `erros_observados` / `observed_errors` are accepted alongside `erros_previstos`.
@@ -13,8 +15,8 @@
 - `tcqa classify --write` normalises `idioma` to the base code and fills `pct_nao_conteudo`.
 - A log entry whose `basis` starts with `TODO` (an unfinished draft stub) fails the check (C0).
 - Reports, summaries and indexes are written with LF line endings on every platform; console output no longer crashes on a Windows code page.
-- New commands: `tcqa lexicon hits|validate|stats|merge|learn`, `tcqa draft-log`, `tcqa review build|apply`, `tcqa export` (RAG JSONL chunks), `tcqa metrics`, `tcqa index summary`.
-- `agent/`: the tcqa agent for Claude Code (launcher `/tcqa`, `tcqa-reviser`, `tcqa-verifier`) with an installer.
+- New commands: `tcqa lexicon hits|validate|stats|merge|learn`, `tcqa draft-log`, `tcqa review build|decide|apply` (review queue in batches; a whole batch can be decided at once), `tcqa export` (RAG JSONL chunks), `tcqa metrics`, `tcqa index summary`.
+- `agent/`: the tcqa agent for Claude Code (launcher `/tcqa`, `tcqa-reviser`, `tcqa-verifier`) with an installer. Examples in the agent files use invented names.
 - METHOD.md: naming speakers from converging evidence, corpus control, non-content segments, personal data, oral forms, book citations, verifier and review queue, draft-log workflow.
 
 ## v0.1.0 — 2026-10
