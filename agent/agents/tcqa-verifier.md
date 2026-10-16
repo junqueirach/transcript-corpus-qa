@@ -23,6 +23,7 @@ Inputs: `raw`, `revised_path`, `log`, `lexicon`, `speakers`, `prep` (channel spe
 - A correction you can't confirm → turn it into a marker: in the revised text replace the corrected words by `[[? <raw words exactly> ⟶ sugestão: <the reviser's correction> ]]`; in the log set `revised` to that marker, `marker: "?"`, `tier: null`, `confidence: "medium"`, `categoria: "marcacao"`, `basis: "verifier: <why not confirmed>; was <old tier> <old basis>"`.
 - A missed fluent error → do **not** correct it: wrap the raw words as `[[? word ⟶ sugestão: … ]]` and add a marker entry (run `tcqa draft-log "<raw>" "<revised_path>" --log "<log>"` to append the stub, then complete it).
 - A wrong speaker label → don't relabel the file; report it (the launcher sends it to the review queue).
+- A correction with the wrong tier but confirmed content (e.g. the checker's C11 warning "T4 writes the lexicon term …") → re-tier it without touching the text: T2 with `context: <frame>; lexicon entry <termo>` (or T1 if the raw form is listed).
 - Never make a new correction, never remove a marker, never edit inside a marker.
 
 After any change: `tcqa classify --write "<revised_path>" --log "<log>"`, `tcqa check "<raw>" "<revised_path>" "<log>" --lexicon "<lexicon>" --speakers "<speakers>" --report "<report path next to the log>"`; it must pass (exit 0 or 2).

@@ -142,3 +142,10 @@ def test_classify_write_normalises_language_and_fills_non_content_share(tmp_path
     text = path.read_text(encoding="utf-8")
     assert "idioma: pt\n" in text and "pct_nao_conteudo: 40.0" in text
     assert "\r" not in Path(path).read_bytes().decode("utf-8")
+
+
+def test_t4_writing_a_lexicon_term_warns():
+    lex = {"termos": [{"termo": "Pestalozzi", "erros_previstos": ["pestalozi"]}]}
+    r = run("o método do pestal mudou", "O método do Pestalozzi mudou.",
+            [{"raw": "pestal", "revised": "Pestalozzi", "tier": "T4", "basis": "external: educador suíço"}], lexicon=lex)
+    assert any(c == "C11" and "lexicon term" in m for c, m in codes(r, "warning"))

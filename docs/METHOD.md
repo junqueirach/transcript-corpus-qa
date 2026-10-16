@@ -62,6 +62,13 @@ Every logged change carries a **tier** (where the justification comes from) and 
 | T3 | **Another file** of the same corpus (`crossfile: other.md ¶12`), or one of the **author's works** (`obra: Title, p. 45` / `cap. 3`); a work confirms spelling and terms, never the speaker's wording | Yes, confidence `high` only |
 | T4 | **Outside knowledge** (historical figures, authors, places, published works, institutions) | Only for public, real-world named entities with confidence `high`; always listed for human review |
 
+The `basis` starts with a prefix that names its source: T1 `lexicon:<term>` (or a short free text for
+surface fixes such as "ASR noise tag"), T2 `context: …` (the frame that admits one reading), T3
+`crossfile: <file> ¶<n>` or `obra: <title>, p. <n>`, T4 `external: …` (who or what, and why).
+
+A T4 correction that writes a term the corpus lexicon already has gets a warning: the lexicon,
+not outside knowledge, is the source — log it as T1 (listed form) or T2 citing the lexicon entry.
+
 A T1 entry citing the lexicon (`basis: "lexicon:<term>"`) must be backed by it: the term exists,
 the revised words are the term or one of its variants, and the raw words are one of its listed errors
 or variants (the known transcription forms of a registered speaker's name count too). A lexicon term

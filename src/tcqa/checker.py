@@ -484,6 +484,12 @@ class Checker:
             if tier == "T4" and marker is None and conf != "high":
                 self.add("error", "C11", f"entry {e['id']}: T4 correction written into the text with confidence {conf!r}", e.get("para"), e["raw"], e["revised"])
             basis = str(e.get("basis") or "")
+            if tier == "T4" and marker is None and self.lexicon.loaded:
+                # outside knowledge is not needed for a term the corpus lexicon already has: that is T1 (listed form) or T2
+                terms = self.lexicon.terms_written(e.get("revised", ""), e.get("raw", ""))
+                if terms:
+                    self.add("warning", "C11", f"entry {e['id']}: T4 writes the lexicon term '{terms[0]}'; log it as T1 (listed form) or T2 citing the lexicon entry",
+                             e.get("para"), e["raw"], e["revised"])
             if tier == "T1" and basis.startswith("lexicon:") and marker is None:
                 term = basis[len("lexicon:"):].strip()
                 if not self.lexicon.loaded:

@@ -62,6 +62,20 @@ class Lexicon:
         if homophone:
             self.homophones.add(ck)
 
+    def terms_written(self, revised: str, raw: str) -> list[str]:
+        """Lexicon terms whose spelling appears in ``revised`` but not in ``raw``."""
+        vk, rk = keys_of(revised), keys_of(raw)
+        found = []
+        for tk, forms in self.written.items():
+            for form in forms:
+                n = len(form)
+                in_rev = any(tuple(vk[i:i + n]) == form for i in range(len(vk) - n + 1))
+                in_raw = any(tuple(rk[i:i + n]) == form for i in range(len(rk) - n + 1))
+                if in_rev and not in_raw:
+                    found.append(self.canonical[tk])
+                    break
+        return found
+
     def is_homophone(self, term: str) -> bool:
         return tuple(keys_of(term)) in self.homophones
 
