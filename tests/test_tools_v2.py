@@ -116,3 +116,21 @@ def test_metrics_and_index_summary(tmp_path):
     assert "TOTAL" in text and "revisao_por_mil" in text
     assert main(["index", "summary", str(run), "--out", str(tmp_path / "s.md")]) == 0
     assert "| **total** | 1 |" in (tmp_path / "s.md").read_text(encoding="utf-8")
+
+
+def test_agent_templates_carry_no_personal_paths():
+    for path in (REPO / "agent").rglob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "C:\\Users" not in text and "D:\\transcript" not in text, path
+        assert "\r" not in text, path
+
+
+def test_agent_install_renders_placeholders(tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("install", REPO / "agent" / "install.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.main(["--claude-home", str(tmp_path)]) == 0
+    skill = (tmp_path / "skills" / "tcqa" / "SKILL.md").read_text(encoding="utf-8")
+    assert "{TCQA_REPO}" not in skill and str(REPO) in skill
+    assert mod.main(["--claude-home", str(tmp_path), "--check"]) == 0

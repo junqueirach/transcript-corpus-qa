@@ -75,6 +75,18 @@ Commands:
 | `tcqa backup FILES --backup-dir DIR [--root ROOT]` | copy raw files to a backup folder, mirroring sub-folders, never overwriting (`name_001.md`, ...); prints the SHA-256 |
 | `tcqa summarize LOG [--out X.md]` | generate the human-readable summary from the log |
 | `tcqa hash FILES` | SHA-256 of files, for `raw_sha256` |
+| `tcqa lexicon hits RAW --lexicon L` | the lexicon entries (and near-matches) that occur in one raw file |
+| `tcqa lexicon validate\|stats\|merge\|learn` | check a lexicon (duplicates, ambiguous or common-word error forms); merge lexicons; grow one from finished logs (`learn --write`: new ASR forms of known terms automatically, new terms to a pending file for approval) |
+| `tcqa draft-log RAW REVISED [--log L]` | write the log's bookkeeping: header, bulk counts, one stub per unexplained difference and marker; stubs (`basis: TODO…`) fail the check until completed |
+| `tcqa review build FOLDER` / `tcqa review apply QUEUE.json` | one grouped human review queue for a run (T3/T4, suggestions, new speakers); apply the decisions back to the files |
+| `tcqa export FOLDER --out chunks.jsonl [--lexicon L]` | RAG-ready chunks with metadata (speaker, role, channel, source URL, class, markers, terms, topics); ads left out by default |
+| `tcqa metrics FOLDER [--csv C] [--baseline B]` | measure a run (entries per tier, markers, review load, speaker naming) to compare versions |
+| `tcqa index summary FOLDER\|indice.csv` | corpus dashboard per folder: classes, readiness, main-author participation |
+
+> **Start with a lexicon.** Without one, domain names and terms can't be fixed from a
+> trusted source: they are only corrected when the context makes them certain and are
+> otherwise marked, and the checker rejects capitalised words it can't trace (C14).
+> `tcqa lexicon validate` checks yours; `tcqa lexicon learn` grows it from every run.
 
 ## The method in one page
 
@@ -104,9 +116,13 @@ class by one step with a written reason; never two.
 the class and the file's provenance (a translation is never fine-tuning
 material by default), never typed by hand.
 
-**Speakers.** Labels come from a registry or a generic list. A new name is
-proposed in the log with the literal self-identification and approved by a
-human; identity is never inferred from the channel.
+**Speakers.** A speaker is named when at least two independent sources agree
+(recording metadata, the host's introduction, a self-identification, direct
+address, authorship clues) — then naming is mandatory; otherwise a generic label
+is used. A name not yet in the registry is proposed in the log with the quotes
+and approved by a human; the channel alone never decides identity. The front
+matter records who took part, in which role, who was only mentioned, and whether
+the corpus's main author speaks.
 
 ## What the checker proves — and what it does not
 
@@ -121,7 +137,7 @@ demo's `--verify` flag and CI check.
 
 ## Tests
 
-203 tests, run on Ubuntu and Windows with Python 3.10 and 3.12. Fifteen
+230+ tests, run on Ubuntu and Windows with Python 3.10 and 3.12. Sixteen
 fixture cases under `fixtures/` (invented text) cover the specified behaviour,
 including adversarial ones: an invented name, a silent deletion, a fluent wrong
 word, a marker whose inside was altered, a wrong class, wrong flags, an unknown
@@ -132,10 +148,21 @@ revision and require the checker to fail every time.
 
 ## Roadmap
 
+## The tcqa agent (Claude Code)
+
+`agent/` holds a Claude Code agent that runs the whole method over a corpus:
+`/tcqa` loads it (commands and help), `/tcqa <folder>` revises. It asks for the
+output root and file naming once, checks the lexicon first, prepares each channel
+(who speaks: host, guests, does the main author speak?), revises one file per
+`tcqa-reviser` agent, has every file re-judged by a `tcqa-verifier` agent, grows the
+lexicon from the results, builds one grouped review queue, and ends every run with
+a summary that starts with what needs your attention. Raw files are never edited.
+Install: `python agent/install.py` (copies the files to `~/.claude/`).
+
+## Roadmap
+
 Documented, not built:
 
-- **Agent runner.** Process a folder file by file with the rules, run `tcqa
-  check` on every result, re-queue failures.
 - **Audio check on flagged passages.** Re-transcribe only the seconds around
   each `[[?? ]]` and propose fixes, never apply them.
 - **More languages.** The filler lists and the stop-word detector cover

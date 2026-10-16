@@ -59,8 +59,15 @@ Every logged change carries a **tier** (where the justification comes from) and 
 |---|---|---|
 | T1 | Nothing beyond the surface: punctuation, paragraphs, case, listed fillers, ASR noise tags, exact lexicon variants | Yes |
 | T2 | The surrounding text of the **same file**; only one coherent reading exists | Yes, confidence `high` only |
-| T3 | **Another file** of the same corpus (cited by file and paragraph) | Yes, confidence `high` only |
+| T3 | **Another file** of the same corpus (`crossfile: other.md ¶12`), or one of the **author's works** (`obra: Title, p. 45` / `cap. 3`); a work confirms spelling and terms, never the speaker's wording | Yes, confidence `high` only |
 | T4 | **Outside knowledge** (historical figures, authors, places, published works, institutions) | Only for public, real-world named entities with confidence `high`; always listed for human review |
+
+A T1 entry citing the lexicon (`basis: "lexicon:<term>"`) must be backed by it: the term exists,
+the revised words are the term or one of its variants, and the raw words are one of its listed errors
+or variants (the known transcription forms of a registered speaker's name count too). A lexicon term
+written from an ASR form that is **not** listed is T2 with context, and the form is proposed for the
+lexicon after the run. Terms marked `risco_homofonia: alto` collide with common words: a T1 fix to
+them is accepted but goes to human review.
 
 `medium` and `low` never change the text. They become a marker with a suggestion.
 Dates, numbers, arithmetic reconstructions ("six years after 1991 is 1997") and
@@ -94,6 +101,21 @@ filler `né`), plus immediate repetitions (`the the`) and ASR noise tags
 `you know`, `so`, `well`, `então`, `tipo`) are **not** on the list: removing them
 needs a log entry.
 
+Oral forms (`tá`, `pra`, `gonna`) are speech, not errors: a corpus may decide to keep
+them as spoken (the default) or to standardise them, and writes that decision in its
+corpus guide. Short interjections of the other speaker (`uhum`, `sim`, `right`) stay
+where they occur, in parentheses. Platform masks such as YouTube's `[ __ ]` stay as
+they are.
+
+**Non-content speech** (ads, sponsor reads, jingles, fixed openings) is still speech: it is
+revised like the rest and never deleted, but its paragraphs are tagged in the front matter
+(`segmentos_nao_conteudo: ["1:anuncio", "29-30:anuncio"]`, types `anuncio`, `vinheta`,
+`abertura`, `encerramento`, `outro`). `tcqa classify --write` computes their share of words
+(`pct_nao_conteudo`) and exporters leave them out by default.
+
+**Personal data** read on air (e-mail, phone, address) is kept as heard by default and the
+file is flagged `contem_dados_pessoais: true`, so a corpus builder can filter or mask it.
+
 ## 6. Language and speaker
 
 The front matter declares `idioma` (the language code; `tcqa classify` detects
@@ -105,9 +127,25 @@ T2, and logged.
 
 Speaker labels (`**[Name]**` at the start of a turn) come from the registry or
 from a generic list (`Interviewer`, `Host`, `Participant 1`, `Audience question`,
-`Moderator`, `Unidentified`). A new name is proposed in the log with the literal
-self-identification from the audio ("I am …") and enters the registry only after
-human approval. Identity is never inferred from the channel.
+`Moderator`, `Unidentified`).
+
+**Naming people.** A speaker is named when the evidence proves who it is: at least
+**two independent sources agree** and none contradicts them. Sources: the recording's
+metadata (`Autor:` in the raw header, the file or video title), the channel (its usual
+host), and the text itself — the host's greeting or introduction ("our guest today,
+Alfredo…"), a self-identification ("I am …"), the person spelling their name, names used in
+direct address or thanks, authorship clues ("in my book …" for a known work of that
+person), biography clues. Third-person mentions rule a person *out* as the speaker.
+The channel alone never decides identity. When the evidence is sufficient, naming is
+mandatory (a generic label would discard known information); when it isn't, a generic
+label is used. A name not yet in the registry is proposed in the log (`falante_novo`
+with the quotes) and enters the registry after human approval.
+
+The front matter records who took part and who was only talked about: `falantes`
+(exactly the labels used in the text), `entrevistador`, `entrevistados`, `mencionados`,
+`evidencia_falantes`, and `autor_principal_participa` — whether the corpus's main
+author speaks in this file. The checker verifies that `falantes` matches the labels and
+that the participation flag agrees with them.
 
 ## 7. Quality class, computed then judged
 
@@ -160,7 +198,14 @@ front matter numbers (counts, class, flags) match what the text actually contain
 It does **not** judge whether a correction is linguistically right, does not
 listen to audio, does not call any model, and runs offline and deterministically.
 A reviser can still log a wrong correction with `high` confidence; what they
-cannot do is change the text silently.
+cannot do is change the text silently. That is why the agent workflow adds an
+independent **verifier** that re-judges every T2/T3/T4 correction and speaker label and
+may only move toward caution (a correction it can't confirm becomes a marker with a
+suggestion), and a **human review queue** for what remains.
+
+A warning the reviser examined and accepts is recorded in the log
+(`{"type": "aceite", "code": "C10", "motivo": "…"}`); the report lists it as accepted and
+it no longer counts. Errors can never be accepted.
 
 ## 11. Front-matter fields
 
@@ -177,16 +222,28 @@ corpus; the checker enforces them as written. Full list with types in
 | `classe_qualidade`, `override_motivo` | final class; reason when it differs by one step | reviser |
 | `apto_rag`, `apto_finetuning` | readiness flags | `tcqa classify --write` |
 | `termos_corrigidos` | T1 lexicon fixes in the log | `tcqa classify --write` |
+| `falantes`, `entrevistador`, `entrevistados`, `mencionados`, `autor_principal_participa`, `evidencia_falantes` | who speaks, in which role, who is only mentioned, does the main author speak, the evidence | reviser (checked against the labels) |
+| `segmentos_nao_conteudo`, `pct_nao_conteudo` | ads and other non-content paragraphs; their share of words | reviser; `tcqa classify --write` |
+| `contem_dados_pessoais` | personal contact data read on air is in the text | reviser |
 
 ## 12. Workflow per file
 
 0. Back up the raw file (mirroring its folder; sequential rename on collision) and
    record its SHA-256.
-1. Read the whole file. Confirm language and native-speaker status.
+1. Read the whole file and the lexicon entries that occur in it
+   (`tcqa lexicon hits raw.md --lexicon …`). Confirm language and native-speaker status.
 2. Convert the header to front matter.
-3. Label speakers.
-4. Revise, logging every change with tier, basis and confidence.
-5. Mark what cannot be recovered.
-6. Run `tcqa classify` to fill the computed fields.
+3. Identify and label speakers (see §6); record roles and participation.
+4. Revise; mark what cannot be recovered; tag non-content segments.
+5. Write the log: `tcqa draft-log raw.md revised.md` writes the header, bulk counts and one
+   stub per difference and marker; complete every stub with tier, basis and confidence
+   (a stub left with `basis: TODO…` fails the check).
+6. Run `tcqa classify --write` to fill the computed fields.
 7. Run `tcqa check`. Fix the log or the text until it passes. Never touch the raw.
 8. Save; regenerate the human summary and the index.
+
+Across a corpus, the agent workflow adds: one speaker pass per channel before revising,
+a verifier per file, the lexicon learning from finished logs (`tcqa lexicon learn`: new ASR
+forms of known terms automatically, new terms only after approval), one grouped human
+review queue per run (`tcqa review build / apply`), a corpus index and dashboard
+(`tcqa index build / summary`) and a RAG export (`tcqa export`).
