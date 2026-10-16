@@ -69,6 +69,30 @@ def _core(raw: str, proposed: str) -> tuple[str, str]:
     return " ".join(rw), " ".join(pw).strip(".,;:!?")
 
 
+BATCHES = ("falantes", "correcoes_verificadas", "correcoes", "sugestoes_nomes", "sugestoes", "palavras_cortadas")
+BATCH_TITLES = {
+    "falantes": "New speakers",
+    "correcoes_verificadas": "Corrections from outside knowledge, confirmed by the verifier (low risk: approve as a batch?)",
+    "correcoes": "Corrections from outside knowledge or another file",
+    "sugestoes_nomes": "Suggestions: names",
+    "sugestoes": "Suggestions: words and phrases",
+    "palavras_cortadas": "Suggestions: cut-off words completed (low risk: approve or reject as a batch)",
+}
+
+
+def _batch(g: dict) -> str:
+    if g["tipo"] == "falante_novo":
+        return "falantes"
+    if g["tipo"].startswith("correcao"):
+        return "correcoes_verificadas" if g.get("verificado") else "correcoes"
+    raw, prop = keys_of(g["raw"]), keys_of(g["proposto"])
+    if len(raw) == 1 and len(prop) == 1 and len(raw[0]) >= 2 and prop[0].startswith(raw[0]) and prop[0] != raw[0]:
+        return "palavras_cortadas"
+    if any(w[:1].isupper() for w in g["proposto"].split()):
+        return "sugestoes_nomes"
+    return "sugestoes"
+
+
 def build_queue(target: Path, approved: Path | None = None) -> dict:
     skip = _approved_set(approved)
     groups: dict[tuple, dict] = {}
@@ -96,9 +120,14 @@ def build_queue(target: Path, approved: Path | None = None) -> dict:
             g = groups.setdefault(key, {"n": 0, "tipo": kind, "raw": " ".join(raw.split()), "proposto": " ".join(proposed.split()),
                                         "tier_sugerido": "T2" if kind == "sugestao" else e.get("tier"),
                                         "basis": e.get("basis"), "decisao": None, "ocorrencias": []})
+            verified = "verificado" in str(e.get("notas") or "").casefold()
+            g["verificado"] = verified if not g["ocorrencias"] else (g["verificado"] and verified)
             g["ocorrencias"].append({"log": str(log_path), "revisado": str(rev) if rev else None,
                                      "id": e.get("id"), "para": e.get("para")})
-    rows = sorted(groups.values(), key=lambda g: (g["tipo"], -len(g["ocorrencias"]), g["proposto"]))
+    for g in groups.values():
+        g["lote"] = _batch(g)
+    order = {b: i for i, b in enumerate(BATCHES)}
+    rows = sorted(groups.values(), key=lambda g: (order[g["lote"]], g["tipo"], -len(g["ocorrencias"]), g["proposto"]))
     for i, g in enumerate(rows, 1):
         g["n"] = i
     return {"_uso": "Preencha 'decisao' com 'aprovar' ou 'rejeitar' (null = decidir depois). "
@@ -110,14 +139,31 @@ def render_queue(queue: dict) -> str:
     rows = queue["itens"]
     out = ["# Human review queue", "", f"{len(rows)} item(s) to decide, "
            f"{sum(len(r['ocorrencias']) for r in rows)} occurrence(s). Fill `decisao` in the JSON file "
-           "(`aprovar` / `rejeitar`), then run `tcqa review apply`.", "",
-           "| # | type | raw → proposed | × | files | basis |", "|---|---|---|---|---|---|"]
-    for r in rows:
-        files = sorted({Path(o["log"]).name.replace(".log.jsonl", "") for o in r["ocorrencias"]})
-        cell = lambda s, n=90: (s or "").replace("|", "\\|")[:n]
-        out.append(f"| {r['n']} | {r['tipo']} | {cell(r['raw'], 60)} → **{cell(r['proposto'], 60)}** | {len(r['ocorrencias'])} | "
-                   f"{cell('; '.join(files), 80)} | {cell(r.get('basis'))} |")
+           "(`aprovar` / `rejeitar`; a whole batch can be decided at once with `tcqa review decide QUEUE --lote <name> --decisao aprovar`), "
+           "then run `tcqa review apply`.", ""]
+    out += ["| batch | items |", "|---|---|"] + [f"| {BATCH_TITLES[b]} (`{b}`) | {sum(1 for r in rows if r.get('lote') == b)} |"
+                                               for b in BATCHES if any(r.get("lote") == b for r in rows)] + [""]
+    cell = lambda s, n=90: (s or "").replace("|", "\\|")[:n]
+    for b in BATCHES:
+        items = [r for r in rows if r.get("lote") == b]
+        if not items:
+            continue
+        out += [f"## {BATCH_TITLES[b]}", "", "| # | type | raw → proposed | × | files | basis |", "|---|---|---|---|---|---|"]
+        for r in items:
+            files = sorted({Path(o["log"]).name.replace(".log.jsonl", "") for o in r["ocorrencias"]})
+            out.append(f"| {r['n']} | {r['tipo']} | {cell(r['raw'], 60)} → **{cell(r['proposto'], 60)}** | {len(r['ocorrencias'])} | "
+                       f"{cell('; '.join(files), 80)} | {cell(r.get('basis'))} |")
+        out.append("")
     return "\n".join(out) + "\n"
+
+
+def decide_batch(queue: dict, batch: str, decision: str, only_undecided: bool = True) -> int:
+    n = 0
+    for r in queue["itens"]:
+        if r.get("lote") == batch and (r.get("decisao") is None or not only_undecided):
+            r["decisao"] = decision
+            n += 1
+    return n
 
 
 # ------------------------------------------------------------------ apply
@@ -252,6 +298,15 @@ def cmd_review(args: argparse.Namespace) -> int:
         print(f"{len(queue['itens'])} item(s) → {out_md} and {out_json}")
         return 0
     queue = json.loads(Path(args.target).read_text(encoding="utf-8"))
+    if args.action == "decide":
+        if args.lote not in BATCHES or args.decisao not in DECISIONS:
+            print(f"use --lote one of {list(BATCHES)} and --decisao one of {list(DECISIONS)}")
+            return 1
+        n = decide_batch(queue, args.lote, args.decisao)
+        Path(args.target).write_text(json.dumps(queue, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+        Path(args.target).with_suffix(".md").write_text(render_queue(queue), encoding="utf-8", newline="\n")
+        print(f"{n} item(s) in '{args.lote}' set to {args.decisao}")
+        return 0
     for line in apply_queue(queue, by=args.by, speakers=Path(args.speakers) if args.speakers else None, approved=approved):
         print(f"  {line}")
     return 0
@@ -259,8 +314,10 @@ def cmd_review(args: argparse.Namespace) -> int:
 
 def add_review_parser(sub) -> None:
     p = sub.add_parser("review", help="build one grouped human review queue for a folder, or apply its decisions")
-    p.add_argument("action", choices=["build", "apply"])
-    p.add_argument("target", help="build: folder (or log) · apply: the queue JSON with decisions filled in")
+    p.add_argument("action", choices=["build", "decide", "apply"])
+    p.add_argument("target", help="build: folder (or log) · decide/apply: the queue JSON")
+    p.add_argument("--lote", help="decide: the batch to decide at once (e.g. palavras_cortadas, correcoes_verificadas)")
+    p.add_argument("--decisao", help="decide: aprovar or rejeitar")
     p.add_argument("--out", help="build: Markdown queue (default: next to the JSON)")
     p.add_argument("--json", help="build: queue JSON (default: <folder>/revisao_humana.json)")
     p.add_argument("--approved", help="pre-approved public entities JSON (left out of the queue; apply adds approved T4 names)")

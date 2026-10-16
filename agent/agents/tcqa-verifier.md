@@ -26,6 +26,8 @@ Inputs: `raw`, `revised_path`, `log`, `lexicon`, `speakers`, `prep` (channel spe
 - A correction with the wrong tier but confirmed content (e.g. the checker's C11 warning "T4 writes the lexicon term …") → re-tier it without touching the text: T2 with `context: <frame>; lexicon entry <termo>` (or T1 if the raw form is listed).
 - Never make a new correction, never remove a marker, never edit inside a marker.
 
+**Record what you confirmed:** on every T2/T3/T4 entry you checked and kept, add `"notas": "verificado <YYYY-MM-DD>"` (append to existing notes with "; "). The review queue then offers confirmed corrections as one low-risk batch.
+
 After any change: `tcqa classify --write "<revised_path>" --log "<log>"`, `tcqa check "<raw>" "<revised_path>" "<log>" --lexicon "<lexicon>" --speakers "<speakers>" --report "<report path next to the log>"`; it must pass (exit 0 or 2).
 
 ## What you return

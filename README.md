@@ -78,7 +78,7 @@ Commands:
 | `tcqa lexicon hits RAW --lexicon L` | the lexicon entries (and near-matches) that occur in one raw file |
 | `tcqa lexicon validate\|stats\|merge\|learn` | check a lexicon (duplicates, ambiguous or common-word error forms); merge lexicons; grow one from finished logs (`learn --write`: new ASR forms of known terms automatically, new terms to a pending file for approval) |
 | `tcqa draft-log RAW REVISED [--log L]` | write the log's bookkeeping: header, bulk counts, one stub per unexplained difference and marker; stubs (`basis: TODO…`) fail the check until completed |
-| `tcqa review build FOLDER` / `tcqa review apply QUEUE.json` | one grouped human review queue for a run (T3/T4, suggestions, new speakers); apply the decisions back to the files |
+| `tcqa review build FOLDER` / `decide QUEUE --lote L --decisao D` / `apply QUEUE.json` | one grouped human review queue for a run, in batches (verified corrections, names, words, cut-off words, new speakers); decide a whole batch at once; apply the decisions back to the files |
 | `tcqa export FOLDER --out chunks.jsonl [--lexicon L]` | RAG-ready chunks with metadata (speaker, role, channel, source URL, class, markers, terms, topics); ads left out by default |
 | `tcqa metrics FOLDER [--csv C] [--baseline B]` | measure a run (entries per tier, markers, review load, speaker naming) to compare versions |
 | `tcqa index summary FOLDER\|indice.csv` | corpus dashboard per folder: classes, readiness, main-author participation |

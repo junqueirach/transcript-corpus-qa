@@ -187,3 +187,13 @@ def test_learn_adds_known_term_forms_but_never_common_words(tmp_path):
     result = learn([log], lex, None, 2)
     assert [r["forma"] for r in result["automatico"]] == ["pestal"]
     assert any(r["forma"] == "mental" and "comum" in r["motivo"] for r in result["retido"])
+
+
+def test_review_batches_and_decide(tmp_path):
+    from tcqa.review import _batch, decide_batch
+    assert _batch({"tipo": "sugestao", "raw": "palest", "proposto": "palestra"}) == "palavras_cortadas"
+    assert _batch({"tipo": "sugestao", "raw": "Otávio Leo", "proposto": "Otávio Leal"}) == "sugestoes_nomes"
+    assert _batch({"tipo": "correcao_T4", "raw": "x", "proposto": "Y", "verificado": True}) == "correcoes_verificadas"
+    queue = {"itens": [{"lote": "palavras_cortadas", "decisao": None}, {"lote": "sugestoes", "decisao": None}]}
+    assert decide_batch(queue, "palavras_cortadas", "aprovar") == 1
+    assert queue["itens"][0]["decisao"] == "aprovar" and queue["itens"][1]["decisao"] is None
