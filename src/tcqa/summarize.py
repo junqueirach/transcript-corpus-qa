@@ -87,7 +87,7 @@ def cmd_summarize(args: argparse.Namespace) -> int:
         return 1
     text = render_summary(log)
     if args.out:
-        Path(args.out).write_text(text, encoding="utf-8")
+        Path(args.out).write_text(text, encoding="utf-8", newline="\n")
         print(f"summary written to {args.out}")
     else:
         print(text)

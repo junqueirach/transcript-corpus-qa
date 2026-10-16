@@ -1,7 +1,9 @@
 """Structured correction log: loading and validation (JSON Lines).
 
 The log has one JSON object per line. Line 1 is the header; every other line is
-either a ``change`` (one edit) or a ``bulk`` (a count of mechanical edits).
+a ``change`` (one edit), a ``bulk`` (a count of mechanical edits: hunks, not
+characters) or an ``aceite`` (a checker warning the reviser examined and accepted,
+with the reason).
 The rules enforced here mirror ``schema/log.schema.json`` and need no library.
 """
 from __future__ import annotations
@@ -30,7 +32,12 @@ CHANGE_REQUIRED = (
     "type", "id", "para", "raw", "revised", "categoria", "tier", "basis",
     "confidence", "marker",
 )
-CHANGE_ALLOWED = set(CHANGE_REQUIRED) | {"para_raw", "falante_novo", "notas"}
+CHANGE_ALLOWED = set(CHANGE_REQUIRED) | {"para_raw", "falante_novo", "notas", "occurrence"}
+ACCEPT_ALLOWED = {"type", "code", "motivo", "para", "notas"}
+CHECK_CODE_RE = re.compile(r"^C\d{1,2}$")
+# T3 basis: another transcript of the corpus, or one of the author's works (decision C2)
+T3_PREFIXES = ("crossfile:", "obra:")
+T3_CITATION_RE = re.compile(r"¶\s*\d+|§\s*\d+|para(?:graph)?\s*\d+|\bp(?:ág)?\.?\s*\d+|\bcap(?:ítulo)?\.?\s*\w+", re.IGNORECASE)
 
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -60,6 +67,7 @@ class Log:
     changes: list[dict] = field(default_factory=list)
     bulks: list[dict] = field(default_factory=list)
     lines: list[dict] = field(default_factory=list)
+    accepted: list[dict] = field(default_factory=list)
 
 
 def parse_jsonl(text: str) -> tuple[list[dict], list[Issue]]:
@@ -142,6 +150,8 @@ def _check_change(obj: dict, issues: list[Issue], seen_ids: set[str]) -> None:
         seen_ids.add(cid)
     if not (isinstance(obj.get("para"), int) and obj["para"] >= 1):
         issues.append(Issue("error", "L24", "para must be an integer >= 1", ln))
+    if "occurrence" in obj and not (isinstance(obj["occurrence"], int) and obj["occurrence"] >= 1):
+        issues.append(Issue("error", "L45", "occurrence must be an integer >= 1 (which occurrence of the raw span in its paragraph)", ln))
     raw, revised = obj.get("raw"), obj.get("revised")
     if not isinstance(raw, str) or not isinstance(revised, str):
         issues.append(Issue("error", "L25", "raw and revised must be strings", ln))
@@ -188,11 +198,13 @@ def _check_change(obj: dict, issues: list[Issue], seen_ids: set[str]) -> None:
     if not (isinstance(basis, str) and basis.strip()):
         issues.append(Issue("error", "L40", "basis is required for every change", ln))
     else:
-        prefix = {"T2": "context:", "T3": "crossfile:", "T4": "external:"}.get(tier)
-        if prefix and not basis.startswith(prefix):
-            issues.append(Issue("error", "L41", f"{tier} entries need a basis starting with '{prefix}'", ln))
-        if tier == "T3" and not re.search(r"¶\s*\d+|§\s*\d+|para(?:graph)?\s*\d+", basis):
+        prefixes = {"T2": ("context:",), "T3": T3_PREFIXES, "T4": ("external:",)}.get(tier)
+        if prefixes and not basis.startswith(prefixes):
+            issues.append(Issue("error", "L41", f"{tier} entries need a basis starting with {' or '.join(repr(x) for x in prefixes)}", ln))
+        if tier == "T3" and basis.startswith("crossfile:") and not re.search(r"¶\s*\d+|§\s*\d+|para(?:graph)?\s*\d+", basis):
             issues.append(Issue("error", "L42", "T3 basis must cite the paragraph of the other file (e.g. 'crossfile: other.md ¶12')", ln))
+        if tier == "T3" and basis.startswith("obra:") and not T3_CITATION_RE.search(basis):
+            issues.append(Issue("error", "L42", "T3 basis from a work must cite where (e.g. 'obra: Title, p. 45' or 'cap. 3')", ln))
     if cat == "falante":
         fn = obj.get("falante_novo")
         if fn is not None and not (isinstance(fn, dict) and fn.get("nome") and fn.get("citacao")):
@@ -210,6 +222,19 @@ def _check_bulk(obj: dict, issues: list[Issue]) -> None:
     extra = set(obj) - {"type", "categoria", "count", "notas", "_line"}
     if extra:
         issues.append(Issue("error", "L52", f"unknown field(s) {sorted(extra)}", ln))
+
+
+def _check_accept(obj: dict, issues: list[Issue]) -> None:
+    ln = obj["_line"]
+    if not (isinstance(obj.get("code"), str) and CHECK_CODE_RE.match(obj["code"])):
+        issues.append(Issue("error", "L60", "aceite needs 'code' naming the check (e.g. 'C5')", ln))
+    if not (isinstance(obj.get("motivo"), str) and obj["motivo"].strip()):
+        issues.append(Issue("error", "L61", "aceite needs 'motivo': why the warning is accepted", ln))
+    if "para" in obj and not (isinstance(obj["para"], int) and obj["para"] >= 1):
+        issues.append(Issue("error", "L62", "aceite 'para' must be an integer >= 1", ln))
+    extra = set(obj) - ACCEPT_ALLOWED - {"_line"}
+    if extra:
+        issues.append(Issue("error", "L63", f"unknown field(s) {sorted(extra)}", ln))
 
 
 def validate_objects(objects: list[dict]) -> list[Issue]:
@@ -232,6 +257,8 @@ def validate_objects(objects: list[dict]) -> list[Issue]:
             _check_change(obj, issues, seen_ids)
         elif kind == "bulk":
             _check_bulk(obj, issues)
+        elif kind == "aceite":
+            _check_accept(obj, issues)
         else:
             issues.append(Issue("error", "L04", f"unknown type {kind!r}", obj["_line"]))
     return issues
@@ -251,6 +278,7 @@ def load_log(path: Path | str) -> tuple[Log | None, list[Issue]]:
         changes=[o for o in objects if o.get("type") == "change"],
         bulks=[o for o in objects if o.get("type") == "bulk"],
         lines=objects,
+        accepted=[o for o in objects if o.get("type") == "aceite"],
     )
     return log, issues
 

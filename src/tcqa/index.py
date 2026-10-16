@@ -22,7 +22,14 @@ COLUMNS = [
     "arquivo", "pasta", "titulo", "tipo", "canal", "data", "duracao", "idioma", "derivado_de",
     "classe_calculada", "classe_qualidade", "falantes", "trechos_incertos", "trechos_irrecuperaveis",
     "pct_irrecuperavel", "apto_rag", "apto_finetuning", "audio_recuperavel", "raw_sha256", "revisado_em",
+    # corpus control and non-content (v2)
+    "autor_principal", "autor_principal_participa", "entrevistador", "entrevistados", "mencionados",
+    "pct_nao_conteudo", "contem_dados_pessoais",
 ]
+
+
+def _join(value) -> str:
+    return ";".join(str(x) for x in value) if isinstance(value, list) else (str(value) if value is not None else "")
 WINDOWS_FORBIDDEN = '<>:"\\|?*'
 TRANSLATION_SUFFIX = re.compile(r"\s*\((PT-BR|pt-BR|EN|en)\)\s*$")
 
@@ -104,6 +111,13 @@ def build_rows(folder: Path) -> tuple[list[dict], list[str]]:
             "audio_recuperavel": _bool(fm.get("audio_recuperavel")),
             "raw_sha256": fm.get("raw_sha256", "") or "",
             "revisado_em": fm.get("revisado_em", "") or "",
+            "autor_principal": fm.get("autor_principal") or "",
+            "autor_principal_participa": _bool(fm.get("autor_principal_participa")),
+            "entrevistador": fm.get("entrevistador") or "",
+            "entrevistados": _join(fm.get("entrevistados")),
+            "mencionados": _join(fm.get("mencionados")),
+            "pct_nao_conteudo": fm.get("pct_nao_conteudo") if fm.get("pct_nao_conteudo") is not None else "",
+            "contem_dados_pessoais": _bool(fm.get("contem_dados_pessoais")),
         })
     return rows, problems
 
@@ -114,6 +128,44 @@ def write_index(rows: list[dict], out: Path) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+# ------------------------------------------------------------------ summary
+
+def _num(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _avg(values) -> str:
+    return f"{sum(values) / len(values):.2f}" if values else ""
+
+
+def _summary_line(name: str, rows: list[dict]) -> str:
+    classes = [r.get("classe_qualidade") or r.get("classe_calculada") for r in rows]
+    unrecoverable = [x for x in (_num(r.get("pct_irrecuperavel")) for r in rows) if x is not None]
+    non_content = [x for x in (_num(r.get("pct_nao_conteudo")) for r in rows) if x is not None]
+    return (f"| {name} | {len(rows)} | {classes.count('A')} | {classes.count('B')} | {classes.count('C')} | "
+            f"{_avg(unrecoverable)} | {sum(1 for r in rows if r.get('apto_rag') == 'true')} | "
+            f"{sum(1 for r in rows if r.get('apto_finetuning') == 'true')} | "
+            f"{sum(1 for r in rows if r.get('autor_principal_participa') == 'true')} | "
+            f"{sum(1 for r in rows if r.get('autor_principal_participa') == 'false')} | {_avg(non_content)} |")
+
+
+def render_summary(rows: list[dict]) -> str:
+    """Corpus dashboard per folder (channel) and in total: classes, unrecoverable
+    share, readiness, main-author participation, non-content share."""
+    groups: dict[str, list[dict]] = {}
+    for r in rows:
+        groups.setdefault(r.get("pasta") or "(root)", []).append(r)
+    out = ["# Corpus summary", "", f"{len(rows)} revised file(s) in {len(groups)} folder(s).", "",
+           "| folder | files | A | B | C | avg % unrecoverable | RAG | fine-tuning | main author speaks | mentioned only | avg % non-content |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
+    out += [_summary_line(name, rs) for name, rs in sorted(groups.items())]
+    out.append(_summary_line("**total**", rows))
+    return "\n".join(out) + "\n"
 
 
 # ------------------------------------------------------------------ audit
@@ -207,6 +259,16 @@ def cmd_index(args: argparse.Namespace) -> int:
         for f_ in findings:
             print(f"  audit: {f_}")
         return 1 if problems else 0
+    if args.action == "summary":
+        target = Path(args.target)
+        rows = read_index(target) if target.is_file() else build_rows(target)[0]
+        text = render_summary(rows)
+        if args.out:
+            Path(args.out).write_text(text, encoding="utf-8", newline="\n")
+            print(f"summary written to {args.out}")
+        else:
+            print(text)
+        return 0
     rows = read_index(Path(args.target))
     findings = audit_index(rows)
     print(f"{len(rows)} row(s), {len(findings)} inconsistency(ies)")
@@ -217,7 +279,8 @@ def cmd_index(args: argparse.Namespace) -> int:
 
 def add_index_parser(sub) -> None:
     p = sub.add_parser("index", help="build the index from files, or audit an existing indice.csv")
-    p.add_argument("action", choices=["build", "audit"])
-    p.add_argument("target", help="folder to scan (build) or index file (audit)")
-    p.add_argument("--out", help="output CSV for build (default: FOLDER/indice.csv)")
+    p.add_argument("action", choices=["build", "audit", "summary"],
+                   help="build: scan a folder recursively (a whole corpus) · audit: check an indice.csv · summary: dashboard per folder")
+    p.add_argument("target", help="folder to scan (build, summary) or index file (audit, summary)")
+    p.add_argument("--out", help="output CSV for build (default: FOLDER/indice.csv), or Markdown for summary")
     p.set_defaults(func=cmd_index)

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import __version__
 from .checker import run_check, sha256_bytes
-from .classify import compute
+from .classify import compute, non_content_share, parse_segments
 from .frontmatter import join_document, split_document
 from .language import detect_language
 from .log import has_errors, load_log
@@ -32,7 +32,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     )
     print(render_text(result))
     if args.report:
-        Path(args.report).write_text(render_markdown(result, raw_path.name, rev_path.name, log_path.name), encoding="utf-8")
+        Path(args.report).write_text(render_markdown(result, raw_path.name, rev_path.name, log_path.name), encoding="utf-8", newline="\n")
         print(f"  report written to {args.report}")
     return result.exit_code(strict=args.strict)
 
@@ -62,10 +62,17 @@ def cmd_classify(args: argparse.Namespace) -> int:
         fm.update(comp.as_frontmatter())
         if fm.get("idioma") is None and detected:
             fm["idioma"] = detected
+        if isinstance(fm.get("idioma"), str):
+            fm["idioma"] = fm["idioma"].split("-")[0].split("_")[0].casefold()   # one form per corpus: 'pt', 'en'
+        if fm.get("segmentos_nao_conteudo"):
+            segments, problems = parse_segments(fm["segmentos_nao_conteudo"], len(doc.text_paragraphs))
+            for problem in problems:
+                print(f"WARNING: {problem}", file=sys.stderr)
+            fm["pct_nao_conteudo"] = non_content_share(doc, segments)
         if fm.get("classe_qualidade") in (None, ""):
             fm["classe_qualidade"] = comp.classe_calculada
         _, body, _ = split_document(text)
-        path.write_text(join_document(fm, body), encoding="utf-8")
+        path.write_text(join_document(fm, body), encoding="utf-8", newline="\n")
         print(f"front matter updated in {path}")
     return 0
 
@@ -117,10 +124,25 @@ def build_parser() -> argparse.ArgumentParser:
     add_index_parser(sub)
     add_backup_parser(sub)
     add_summarize_parser(sub)
+    from .lexicon_tools import add_lexicon_parser  # noqa: E402
+    from .draftlog import add_draft_log_parser  # noqa: E402
+    from .review import add_review_parser  # noqa: E402
+    from .export import add_export_parser  # noqa: E402
+    from .metrics import add_metrics_parser  # noqa: E402
+    add_lexicon_parser(sub)
+    add_draft_log_parser(sub)
+    add_review_parser(sub)
+    add_export_parser(sub)
+    add_metrics_parser(sub)
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")   # a Windows console (cp1252) must not crash on '→' or '¶'
+        except (AttributeError, ValueError):
+            pass
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

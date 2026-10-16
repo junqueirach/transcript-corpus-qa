@@ -10,7 +10,12 @@
   "properties": {
     "titulo": {"type": "string", "description": "Title of the recording"},
     "autor_principal": {"type": ["string", "null"], "description": "Main speaker"},
-    "falantes": {"type": "array", "items": {"type": "string"}, "description": "Speakers in order of appearance; one entry means a solo talk (no labels allowed)"},
+    "falantes": {"type": "array", "items": {"type": "string"}, "description": "Speakers in order of appearance; one entry means a solo talk (no labels allowed). Must match the labels used in the text"},
+    "entrevistador": {"type": ["string", "null"], "description": "Label of the person conducting the interview (host); null for a solo talk"},
+    "entrevistados": {"type": "array", "items": {"type": "string"}, "description": "Labels of the interviewed / main speakers"},
+    "mencionados": {"type": "array", "items": {"type": "string"}, "description": "People talked about but not speaking (corpus control)"},
+    "autor_principal_participa": {"type": ["boolean", "null"], "description": "Corpus control: does autor_principal speak in this file (true) or is only mentioned or absent (false)?"},
+    "evidencia_falantes": {"type": "array", "items": {"type": "string"}, "description": "Evidence for each speaker name: header Autor, file name, quotes with their paragraph"},
     "tipo": {"type": ["string", "null"], "description": "Palestra | Podcast | Live | Entrevista | Curso | Outro"},
     "canal": {"type": ["string", "null"]},
     "data": {"type": ["string", "null"], "description": "As precise as the source allows (YYYY, YYYY-MM or YYYY-MM-DD)"},
@@ -38,6 +43,9 @@
     "override_motivo": {"type": ["string", "null"], "description": "One sentence; required when classe_qualidade differs from classe_calculada"},
     "apto_rag": {"type": "boolean", "description": "(computed) false only when more than half of the words are unrecoverable"},
     "apto_finetuning": {"type": "boolean", "description": "(computed) false for class C, for translations, and for languages outside the configured scope"},
+    "segmentos_nao_conteudo": {"type": "array", "items": {"type": "string", "pattern": "^\\d+(-\\d+)?:(anuncio|vinheta|abertura|encerramento|outro)$"}, "description": "Non-content paragraphs (ads, jingles) kept in the text but excluded from exports by default, e.g. [\"1:anuncio\", \"29-30:anuncio\"]"},
+    "pct_nao_conteudo": {"type": "number", "minimum": 0, "maximum": 100, "description": "(computed) share of body words inside segmentos_nao_conteudo"},
+    "contem_dados_pessoais": {"type": ["boolean", "null"], "description": "Personal contact data read on air (e-mail, phone, address) is in the text, kept as heard"},
     "observacoes": {"type": ["string", "null"]}
   },
   "additionalProperties": true

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `tcqa check` (C11): a T1 entry with `basis: "lexicon:<term>"` is now verified against the lexicon. The term must exist, the revised span must be the term or one of its variants, and the raw span must be one of its listed errors or variants (context words around the term are allowed). Before, any change could be passed off as T1 by citing a lexicon term, which was a false pass. Without `--lexicon` the entry gets a warning ("not verified"). New fixture `bad_t1_not_in_lexicon`.
+- Lexicon loader: `erros_observados` / `observed_errors` are accepted alongside `erros_previstos`.
+
 ## v0.1.0 — 2026-10
 
 First release.

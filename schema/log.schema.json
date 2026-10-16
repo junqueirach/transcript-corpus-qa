@@ -2,11 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/junqueirach/transcript-corpus-qa/schema/log.schema.json",
   "title": "tcqa structured correction log (one JSON object per line)",
-  "description": "Line 1 is a header object. Every following line is a change or a bulk object. The same rules are enforced in code by tcqa.log.validate_log, which needs no external library; this file documents them.",
+  "description": "Line 1 is a header object. Every following line is a change, a bulk or an aceite object. The same rules are enforced in code by tcqa.log.validate_log, which needs no external library; this file documents them.",
   "oneOf": [
     {"$ref": "#/$defs/header"},
     {"$ref": "#/$defs/change"},
-    {"$ref": "#/$defs/bulk"}
+    {"$ref": "#/$defs/bulk"},
+    {"$ref": "#/$defs/aceite"}
   ],
   "$defs": {
     "header": {
@@ -37,6 +38,7 @@
         "id": {"type": "string", "pattern": "^c\\d{4,}$"},
         "para": {"type": "integer", "minimum": 1},
         "para_raw": {"type": "integer", "minimum": 1},
+        "occurrence": {"type": "integer", "minimum": 1, "description": "Which occurrence of the raw span in the raw file (1 = first); only needed when the span repeats and the alignment can't tell"},
         "raw": {"type": "string"},
         "revised": {"type": "string"},
         "categoria": {"type": "string", "enum": ["pontuacao", "nome", "termo", "sentido", "falante", "ruido", "hesitacao", "marcacao", "insercao", "remocao", "traducao"]},
@@ -59,7 +61,20 @@
       "properties": {
         "type": {"const": "bulk"},
         "categoria": {"type": "string", "enum": ["pontuacao", "hesitacao", "ruido"]},
-        "count": {"type": "integer", "minimum": 0},
+        "count": {"type": "integer", "minimum": 0, "description": "Number of edits (hunks) of this kind, not characters or words"},
+        "notas": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "aceite": {
+      "type": "object",
+      "description": "A checker warning the reviser examined and accepted. tcqa check reports it as accepted and does not count it. Errors can never be accepted.",
+      "required": ["type", "code", "motivo"],
+      "properties": {
+        "type": {"const": "aceite"},
+        "code": {"type": "string", "pattern": "^C\\d{1,2}$"},
+        "motivo": {"type": "string", "minLength": 1},
+        "para": {"type": "integer", "minimum": 1},
         "notas": {"type": ["string", "null"]}
       },
       "additionalProperties": false
@@ -71,7 +86,8 @@
     "A marker entry (marker != null) has tier null and its revised span contains the raw span unchanged, inside [[? ]] or [[?? ]], optionally followed by ' ⟶ sugestão: ...'.",
     "A non-marker entry with raw == '' has categoria 'insercao' or 'falante'; with revised == '' it has categoria 'remocao', 'ruido' or 'hesitacao'.",
     "A non-marker change (text actually altered) has a tier and confidence 'high'. Confidence medium/low is only valid on marker entries (suggestions).",
-    "T3 requires basis starting with 'crossfile:'; T4 requires basis starting with 'external:'; T2 requires basis starting with 'context:'; T1 requires basis starting with 'lexicon:' or a short free-text basis.",
+    "T1 with basis 'lexicon:<term>' must be backed by the lexicon (or the speaker registry's transcription variants): the term exists, revised is the term or a variant, raw is a listed error or variant.",
+    "T3 requires basis starting with 'crossfile:' (citing the other file's ¶) or 'obra:' (one of the author's works, citing p. / cap. / ¶); T4 requires basis starting with 'external:'; T2 requires basis starting with 'context:'; T1 requires basis starting with 'lexicon:' or a short free-text basis.",
     "classe_qualidade may differ from classe_calculada by at most one step and only when override_motivo is a non-empty string."
   ]
 }

@@ -14,6 +14,57 @@ SECTION_MAX_SHARE = 0.25       # a "section" holds at most 25 % of the words
 SECTION_MIN_BAD_SHARE = 0.75   # ... and at least 75 % of the unrecoverable words
 RAG_UNREADABLE_PCT = 50.0      # above this the file is not even searchable
 CLASSES = ("A", "B", "C")
+SEGMENT_TYPES = ("anuncio", "vinheta", "abertura", "encerramento", "outro")   # non-content speech (decision F4)
+
+
+def parse_segments(value, n_paras: int) -> tuple[dict[int, str], list[str]]:
+    """``segmentos_nao_conteudo``: a one-line list of ``"<paras>:<tipo>"`` items, where
+    paras is ``3`` or ``3-5`` (front matter has no nested blocks), e.g.
+    ``["1:anuncio", "29-30:anuncio"]``.
+
+    Returns {paragraph: type} and a list of problems. Tagged paragraphs stay in
+    the transcript; exporters leave them out by default.
+    """
+    out: dict[int, str] = {}
+    problems: list[str] = []
+    if value in (None, []):
+        return out, problems
+    if not isinstance(value, list):
+        return out, ["segmentos_nao_conteudo must be a list like [\"1:anuncio\", \"29-30:anuncio\"]"]
+    for i, seg in enumerate(value, 1):
+        if isinstance(seg, str) and ":" in seg:
+            paras_txt, kind = (x.strip() for x in seg.rsplit(":", 1))
+            seg = {"paras": paras_txt, "tipo": kind}
+        if not isinstance(seg, dict):
+            problems.append(f"segmentos_nao_conteudo[{i}] must look like \"3-5:anuncio\"")
+            continue
+        kind = seg.get("tipo")
+        if kind not in SEGMENT_TYPES:
+            problems.append(f"segmentos_nao_conteudo[{i}]: tipo {kind!r} is not one of {list(SEGMENT_TYPES)}")
+        paras = seg.get("paras")
+        nums: list[int] = []
+        items = paras if isinstance(paras, list) else [paras]
+        for item in items:
+            if isinstance(item, int):
+                nums.append(item)
+            elif isinstance(item, str) and "-" in item and all(x.strip().isdigit() for x in item.split("-", 1)):
+                a, b = (int(x) for x in item.split("-", 1))
+                nums.extend(range(a, b + 1))
+            elif isinstance(item, str) and item.strip().isdigit():
+                nums.append(int(item))
+            else:
+                problems.append(f"segmentos_nao_conteudo[{i}]: paras {paras!r} is not a number, list or range 'a-b'")
+        for n in nums:
+            if not 1 <= n <= n_paras:
+                problems.append(f"segmentos_nao_conteudo[{i}]: paragraph {n} does not exist (1-{n_paras})")
+            else:
+                out[n] = kind or "outro"
+    return out, problems
+
+
+def non_content_share(doc: Document, segments: dict[int, str]) -> float:
+    words = sum(1 for t in doc.tokens if t.para in segments)
+    return pct(words, len(doc.tokens))
 
 
 @dataclass

@@ -52,6 +52,10 @@ def render_markdown(result: Result, raw_name: str, revised_name: str, log_name: 
         lines += ["| severity | check | ¶ | raw | revised | explanation |", "|---|---|---|---|---|---|"]
         for f in sorted(findings, key=lambda f: (f.severity != "error", f.check, f.para or 0)):
             lines.append(f"| {f.severity} | {f.check} {CHECK_NAMES.get(f.check, '')} | {f.para or ''} | {_cell(f.raw)} | {_cell(f.revised)} | {_cell(f.message, 160)} |")
+    accepted = [f for f in result.findings if f.severity == "info" and "— accepted:" in f.message]
+    if accepted:
+        lines += ["", "### Accepted warnings (examined by the reviser, reason in the log)", ""]
+        lines += [f"- {f.check}{' ¶' + str(f.para) if f.para else ''}: {_cell(f.message, 240)}" for f in accepted]
     lines.append("")
     lines += ["## Review list (risky corrections and suggestions)", ""]
     if not result.review:
@@ -81,6 +85,9 @@ def render_text(result: Result) -> str:
     if st:
         out.append(f"  words raw/revised: {st.get('raw_words')}/{st.get('revised_words')}; hunks: {st.get('hunks')} "
                    f"(fillers {st.get('hesitation_hunks')}, explained {st.get('explained_hunks')}, unexplained {st.get('unexplained_hunks')})")
+    n_acc = sum(1 for f in result.findings if f.severity == "info" and "— accepted:" in f.message)
+    if n_acc:
+        out.append(f"  accepted warnings: {n_acc} (reasons in the log and the report)")
     if result.review:
         out.append(f"  review list: {len(result.review)} item(s) — see the Markdown report")
     return "\n".join(out)
