@@ -171,3 +171,19 @@ def test_corpus_frequency_flags_common_error_forms(tmp_path):
         raws.append(p)
     flagged = " ".join(corpus_common_forms(data, raws, 0.5))
     assert "'veja'" in flagged and "ponta sirena" not in flagged
+
+
+def test_learn_adds_known_term_forms_but_never_common_words(tmp_path):
+    from tcqa.lexicon_tools import learn
+    lex = tmp_path / "lex.json"
+    lex.write_text(json.dumps({"termos": [{"termo": "Mentalma"}, {"termo": "Pestalozzi"}]}), encoding="utf-8")
+    header = {"type": "header", "file": "r.md", "raw_sha256": "0" * 64, "idioma": "pt", "derivado_de": None, "versao_revisao": 1,
+              "revisado_em": "2026-10-16", "revisado_por": "t", "classe_calculada": "A", "classe_qualidade": "A", "override_motivo": None}
+    ch = lambda i, raw, rev: {"type": "change", "id": f"c{i:04d}", "para": 1, "raw": raw, "revised": rev, "categoria": "nome",
+                              "tier": "T2", "basis": "context: x", "confidence": "high", "marker": None}
+    lines = [header, ch(1, "pestal", "Pestalozzi"), ch(2, "pestal", "Pestalozzi"), ch(3, "mental", "Mentalma"), ch(4, "mental", "Mentalma")]
+    log = tmp_path / "a.log.jsonl"
+    log.write_text("\n".join(json.dumps(l, ensure_ascii=False) for l in lines) + "\n", encoding="utf-8")
+    result = learn([log], lex, None, 2)
+    assert [r["forma"] for r in result["automatico"]] == ["pestal"]
+    assert any(r["forma"] == "mental" and "comum" in r["motivo"] for r in result["retido"])

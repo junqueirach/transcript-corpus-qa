@@ -73,6 +73,8 @@ def build_rows(folder: Path) -> tuple[list[dict], list[str]]:
     for path in sorted(folder.rglob("*.md")):
         if path.name.upper() in ("README.MD", "CLAUDE.MD", "LEIA-ME.MD"):
             continue
+        if any(part.startswith("_") for part in path.relative_to(folder).parts[:-1]):
+            continue  # workspace and audit folders (_tcqa, _auditoria, ...) hold copies, not corpus files
         text = path.read_text(encoding="utf-8")
         doc = analyze(text)
         if doc.header_kind != "yaml":

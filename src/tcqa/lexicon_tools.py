@@ -229,8 +229,15 @@ def _core(lex, revised: str, raw: str):
     """(term, raw form) when the revised span writes a lexicon term and the raw span
     replaced at that place is not yet a listed form of it."""
     rk, vk = tuple(keys_of(raw)), tuple(keys_of(revised))
+    # already known: some term writes exactly this revised span and lists this raw span
+    for tk, forms in lex.written.items():
+        if vk in forms and rk in lex.replaceable[tk]:
+            return None
+    candidates = []
     for tk, forms in lex.written.items():
         for form in forms:
+            if len(form) == 1 and (form[0] in COMMON_WORDS or len(form[0]) <= 3):
+                continue                       # a match through a common word ('pra' of PRA) proves nothing
             n = len(form)
             for i in range(len(vk) - n + 1):
                 if vk[i:i + n] != form:
@@ -239,8 +246,11 @@ def _core(lex, revised: str, raw: str):
                 if len(rk) > len(pre) + len(post) and rk[:len(pre)] == pre and rk[len(rk) - len(post):] == post:
                     core = rk[len(pre):len(rk) - len(post)]
                     if core and core not in lex.replaceable[tk] and core != tk:
-                        return lex.canonical[tk], core
-    return None
+                        candidates.append((n, lex.canonical[tk], core))
+    if not candidates:
+        return None
+    _, term, core = max(candidates, key=lambda c: c[0])   # the longest term wins ('Jan Val Ellam' over 'Val Ellam')
+    return term, core
 
 
 def learn(log_paths: list[Path], lexicon_path: Path, speakers_path: Path | None, min_count: int) -> dict:
@@ -266,11 +276,18 @@ def learn(log_paths: list[Path], lexicon_path: Path, speakers_path: Path | None,
                 continue
             # a capitalised name written into the text that the lexicon doesn't know: a pending term
             if e.get("categoria") in ("nome", "termo") and e.get("tier") in ("T2", "T3", "T4"):
-                new_words = [w for w in e.get("revised", "").split() if w[:1].isupper()]
+                # only the changed core (context words shared at both ends dropped), only real names
+                rw, pw = e.get("raw", "").split(), e.get("revised", "").split()
+                while len(rw) > 1 and len(pw) > 1 and keys_of(rw[0]) == keys_of(pw[0]):
+                    rw, pw = rw[1:], pw[1:]
+                while len(rw) > 1 and len(pw) > 1 and keys_of(rw[-1]) == keys_of(pw[-1]):
+                    rw, pw = rw[:-1], pw[:-1]
+                new_words = [w.strip(".,;:!?()\"'") for w in pw if w[:1].isupper()]
+                new_words = [w for w in new_words if len(w) >= 3 and not set(keys_of(w)) <= COMMON_WORDS]
                 if new_words and not any(tuple(keys_of(w)) in lex.canonical for w in new_words):
-                    name = " ".join(new_words).strip(".,;:!?")
+                    name = " ".join(new_words)
                     rec = pending.setdefault(name, {"termo": name, "formas_asr": Counter(), "vezes": 0, "arquivos": set(), "tiers": Counter(), "basis": []})
-                    rec["formas_asr"][e.get("raw", "")] += 1
+                    rec["formas_asr"][" ".join(rw)] += 1
                     rec["vezes"] += 1
                     rec["arquivos"].add(path.name)
                     rec["tiers"][e.get("tier")] += 1
@@ -281,8 +298,14 @@ def learn(log_paths: list[Path], lexicon_path: Path, speakers_path: Path | None,
         rec["arquivos"] = sorted(rec["arquivos"])
         enough = rec["vezes"] >= min_count or len(rec["arquivos"]) >= 2
         homophone = lex.is_homophone(rec["termo"])
-        (auto if enough and not homophone else held).append({**rec, "motivo": None if enough and not homophone else
-                                                              ("risco de homofonia: precisa aprovação" if homophone else f"visto {rec['vezes']}× (< {min_count})")})
+        common = set(keys_of(rec["forma"])) <= COMMON_WORDS      # 'mental' for Mentalma: a real word, never automatic
+        if enough and not homophone and not common:
+            auto.append({**rec, "motivo": None})
+        else:
+            why = ("risco de homofonia: precisa aprovação" if homophone else
+                   "forma é palavra comum: precisa aprovação (e risco_homofonia no termo)" if common else
+                   f"visto {rec['vezes']}× (< {min_count})")
+            held.append({**rec, "motivo": why})
     pend = []
     for rec in pending.values():
         pend.append({**rec, "formas_asr": dict(rec["formas_asr"]), "arquivos": sorted(rec["arquivos"]), "tiers": dict(rec["tiers"])})

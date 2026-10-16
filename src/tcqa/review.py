@@ -86,7 +86,13 @@ def build_queue(target: Path, approved: Path | None = None) -> dict:
                 raw, proposed = _core(raw, proposed)
             if kind.startswith("correcao") and tuple(keys_of(proposed)) in skip:
                 continue
-            key = (kind, tuple(keys_of(raw)), " ".join(proposed.split()).casefold())
+            # corrections to the same name are one decision whatever the raw form ('El', 'Elan' → Elon)
+            raw_key = () if kind.startswith("correcao") else tuple(keys_of(raw))
+            key = (kind, raw_key, " ".join(proposed.split()).casefold())
+            if key in groups and kind.startswith("correcao"):
+                forms = groups[key]["raw"].split(" / ")
+                if " ".join(raw.split()) not in forms:
+                    groups[key]["raw"] = " / ".join(forms + [" ".join(raw.split())])
             g = groups.setdefault(key, {"n": 0, "tipo": kind, "raw": " ".join(raw.split()), "proposto": " ".join(proposed.split()),
                                         "tier_sugerido": "T2" if kind == "sugestao" else e.get("tier"),
                                         "basis": e.get("basis"), "decisao": None, "ocorrencias": []})
