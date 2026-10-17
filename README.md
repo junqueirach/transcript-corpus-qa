@@ -1,11 +1,12 @@
 # transcript-corpus-qa
 
-**Check that a corrected speech-to-text transcript changed only what it says it changed, before the text goes into a RAG or fine-tuning corpus.**
+**AI revision of speech-to-text transcripts that can be checked: a Claude Code agent corrects a whole corpus, a second agent re-checks every correction, and an offline checker proves that each transcript changed only what its log says, before the text goes into a RAG or fine-tuning corpus.**
 
 [![CI](https://github.com/junqueirach/transcript-corpus-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/junqueirach/transcript-corpus-qa/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
-![No dependencies](https://img.shields.io/badge/dependencies-none-success)
+![Agent: Claude Code](https://img.shields.io/badge/agent-Claude%20Code-d97757)
+![Checker: no dependencies](https://img.shields.io/badge/checker-no%20dependencies-success)
 
 ## Why this exists
 
@@ -20,16 +21,46 @@ plausible one, a sentence that made no sense gets rewritten into one that
 does, a whole paragraph disappears because it was "repetitive". Nothing looks
 wrong. The corpus now attributes to the speaker words the speaker never said.
 
-`tcqa` is a small offline tool plus a written method that make this
+`tcqa` lets an AI do the revising, under a written method that makes this
 impossible to do unnoticed. Every change that is not mechanical must be in a
 log with its justification, and anything the reviser could not recover must
 be **marked, with the original words kept inside the mark**, instead of
 filled in. The checker compares raw and revised word by word and refuses any
 difference the log does not explain.
 
+## Two parts: the AI agent and the checker
+
+Only one of the two parts uses AI.
+
+| Part | What it does | What it needs |
+|---|---|---|
+| **Agent** (`agent/`, since v0.2.0) | Does the revising. One Claude agent corrects each transcript, logs every change and marks what it cannot recover; a second agent re-judges every correction; the checker then runs on each file. | Claude Code with a Claude account (the agents use Claude models, Opus by default), plus this package installed |
+| **Checker** (the `tcqa` command) | Decides whether a revision may enter the corpus: compares raw and revised word by word against the log. Also builds the review queue, index, metrics and RAG export. | Python 3.10+, nothing else: no AI, no network, same inputs give the same report |
+
+The AI corrects; the checker, which is not AI, proves the correction changed
+only what it says. The checker also works on its own, on revisions made by a
+person or by any other model.
+
 > A marked doubt is better than a reconstructed guess.
 
-## How it works
+## The agent: AI revision in Claude Code
+
+`agent/` holds a Claude Code agent that runs the whole method over a corpus:
+`/tcqa` loads it (commands and help), `/tcqa <folder>` revises. It asks for the
+output root and file naming once, checks the lexicon first, prepares each channel
+(who speaks: host, guests, does the main author speak?), revises one file per
+`tcqa-reviser` agent, has every file re-judged by a `tcqa-verifier` agent, runs
+`tcqa check` on every result, grows the lexicon from the results, builds one grouped
+review queue for a human, and ends every run with a summary that starts with what
+needs your attention. Raw files are never edited.
+
+Needs Claude Code signed in to a Claude account; the revising and verifying use
+Claude models and count against that account's usage. Install this package first
+(Quick start below), then `python agent/install.py` (copies the agent files to
+`~/.claude/`). The agent has been run on Windows only so far. The examples in
+`agent/` use invented names.
+
+## How the check works
 
 ![How tcqa check works](docs/screenshots/how-it-works.png)
 
@@ -45,6 +76,8 @@ fixes, cross-file fixes, every suggestion the reviser was not sure about), so a
 human can review a file in minutes instead of re-reading it.
 
 ## Quick start
+
+The checker and its demo need no AI and no account:
 
 ```
 git clone https://github.com/junqueirach/transcript-corpus-qa
@@ -130,8 +163,9 @@ It proves that every difference between raw and revised is mechanical, a
 listed filler, a marker wrapping the original, or explained by a log entry
 with a tier and a basis, and that the front-matter numbers match the text.
 
-It does **not** judge whether a correction is linguistically right, does not
-listen to audio, does not call any model, and has no network access. It is
+It does **not** judge whether a correction is linguistically right (that is
+the verifier agent's job, and in the end a human's), does not listen to audio,
+does not call any model, and has no network access. It is
 deterministic: the same inputs give the same report byte for byte, which the
 demo's `--verify` flag and CI check.
 
@@ -145,21 +179,6 @@ speaker, a medium-confidence outside-knowledge correction written into the
 text, and a translation with the wrong paragraph count. Seventy-five
 random-mutation tests insert, delete or swap one content word in a passing
 revision and require the checker to fail every time.
-
-## The tcqa agent (Claude Code)
-
-`agent/` holds a Claude Code agent that runs the whole method over a corpus:
-`/tcqa` loads it (commands and help), `/tcqa <folder>` revises. It asks for the
-output root and file naming once, checks the lexicon first, prepares each channel
-(who speaks: host, guests, does the main author speak?), revises one file per
-`tcqa-reviser` agent, has every file re-judged by a `tcqa-verifier` agent, grows the
-lexicon from the results, builds one grouped review queue, and ends every run with
-a summary that starts with what needs your attention. Raw files are never edited.
-Install: `python agent/install.py` (copies the files to `~/.claude/`).
-
-The agent runs inside Claude Code and uses Claude models to revise and verify. The
-`tcqa` commands it calls stay offline and deterministic: the agent judges, the checker
-proves. The examples in `agent/` use invented names.
 
 ## Roadmap
 
